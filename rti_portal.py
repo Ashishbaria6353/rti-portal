@@ -111,9 +111,6 @@ def load_data():
             for col in cols:
                 if col not in df.columns:
                     df[col] = ""
-            df['RTI_તારીખ'] = pd.to_datetime(df['RTI_તારીખ'], errors='coerce').dt.date
-            df['FAA_તારીખ'] = pd.to_datetime(df['FAA_તારીખ'], errors='coerce').dt.date
-            df['SA_તારીખ'] = pd.to_datetime(df['SA_તારીખ'], errors='coerce').dt.date
             return df
         except Exception:
             return pd.DataFrame(columns=cols)
@@ -132,7 +129,7 @@ extra_docs_df = load_extra_docs()
 if not user_df.empty and 'સ્ટેટસ' not in user_df.columns:
     user_df['સ્ટેટસ'] = 'પેન્ડિંગ'
 
-# --- સુધારેલું અને પાવરફુલ ઓટોમેટિક ટાઈમ લૉજિક ---
+# --- પાવરફુલ ઓટોમેટિક ટાઈમ લૉજિક ---
 if not user_df.empty:
     today = date.today()
     changed = False
@@ -140,32 +137,30 @@ if not user_df.empty:
         real_index = df[df['ID'] == row['ID']].index[0]
         status_val = str(row.get('સ્ટેટસ', 'પેન્ડિંગ'))
         
-        rti_dt = row.get('RTI_તારીખ')
-        faa_dt = row.get('FAA_તારીખ')
-        sa_dt = row.get('SA_તારીખ')
+        rti_str = str(row.get('RTI_તારીખ', ''))
+        faa_str = str(row.get('FAA_તારીખ', ''))
+        sa_str = str(row.get('SA_તારીખ', ''))
         
-        # જો નિકાલ ન થયો હોય તો જ સમય ગણવો
+        rti_dt = pd.to_datetime(rti_str, errors='coerce').date() if rti_str and rti_str != "nan" else None
+        faa_dt = pd.to_datetime(faa_str, errors='coerce').date() if faa_str and faa_str != "nan" else None
+        sa_dt = pd.to_datetime(sa_str, errors='coerce').date() if sa_str and sa_str != "nan" else None
+        
         if status_val != 'નિકાલ':
-            # ૧. જો બીજી અપીલની તારીખ ભરેલી હોય તો સ્ટેટસ 'બીજી અપીલ પેન્ડિંગ'
-            if pd.notna(sa_dt) and str(sa_dt) != "" and str(sa_dt) != "NaT":
-                if status_val != 'બીજી અપીલ પેન્ડિંગ':
-                    df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
-                    changed = True
-            
-            # ૨. જો પ્રથમ અપીલની તારીખ ભરેલી હોય
-            elif pd.notna(faa_dt) and str(faa_dt) != "" and str(faa_dt) != "NaT":
-                # અપીલ તારીખથી ૪૫ દિવસ વીતી ગયા હોય અને બીજી અપીલ ન કરી હોય તો 'બીજી અપીલ બાકી'
-                if (today - faa_dt).days > 45:
+            if faa_dt is not None:
+                if (today - faa_dt).days > 45 and (sa_dt is None):
                     if status_val != 'બીજી અપીલ બાકી':
                         df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ બાકી'
                         changed = True
                 else:
-                    if status_val != 'પ્રથમ અપીલ પેન્ડિંગ':
-                        df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
-                        changed = True
-            
-            # ૩. જો હજી પ્રથમ અપીલ ન કરી હોય પણ RTI તારીખથી ૩૦ દિવસ વીતી ગયા હોય
-            elif pd.notna(rti_dt) and str(rti_dt) != "" and str(rti_dt) != "NaT":
+                    if sa_dt is not None:
+                        if status_val != 'બીજી અપીલ પેન્ડિંગ':
+                            df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
+                            changed = True
+                    else:
+                        if status_val != 'પ્રથમ અપીલ પેન્ડિંગ':
+                            df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
+                            changed = True
+            elif rti_dt is not None:
                 if (today - rti_dt).days > 30:
                     if status_val != 'પ્રથમ અપીલ બાકી':
                         df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ બાકી'
@@ -197,11 +192,11 @@ if not user_df.empty and search_term:
 else:
     filtered_df = user_df
 
-# --- કાઉન્ટર ડેટા મેળવો ---
+# --- કાઉન્ટર ડેટા મેળવો (જ્યાં સુધી નિકાલ ન થાય ત્યાં સુધી પેન્ડિંગ બોક્સમાં ગણતરી ચાલુ રહેશે) ---
 total_rti = len(user_df) if not user_df.empty else 0
-pending_rti = len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+pending_rti = len(user_df[user_df["સ્ટેટસ"] != "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 first_due = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
-first_done = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+first_done = len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 second_due = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 second_done = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
@@ -248,16 +243,16 @@ with tab1:
                 else:
                     new_id = "1"
             
-            new_row = {"ID": new_id, "User_Mobile": st.session_state['user_mobile'], "સ્ટેટસ": "પેન્ડિંગ", "RTI_તારીખ": rti_date, "PIO_કચેરી": pio_name, "PIO_સરનામું": pio_address, 
+            new_row = {"ID": new_id, "User_Mobile": st.session_state['user_mobile'], "સ્ટેટસ": "પેન્ડિંગ", "RTI_તારીખ": str(rti_date), "PIO_કચેરી": pio_name, "PIO_સરનામું": pio_address, 
                        "PIO_પિનકોડ": pio_pin, "PIO_મોબાઈલ": pio_mob, "RTI_સ્પીડપોસ્ટ": rti_speed, "RTI_ફાઈલ": save_uploaded_file(rti_file)}
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(DATA_FILE, index=False)
-            st.success(f"નવી RTI સફળતાપૂર્વક દાખલ થઈ ગઈ છે! (ID: {new_id})")
+            st.success(f"નવી RTI સફળતાપૂર્વક દાખલ થઈ ગઈ છે! નવા ID: {new_id}")
             st.rerun()
 
 with tab2:
     st.subheader("⚖️ પ્રથમ અપીલની વિગતો અને સુનાવણી તારીખ")
-    first_rtis = user_df[user_df['સ્ટેટસ'].isin(['પેન્ડિંગ', 'પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    first_rtis = user_df[user_df['સ્ટેટસ'] != 'નિકાલ'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
     if not first_rtis.empty:
         selected_rti = st.selectbox("RTI પસંદ કરો", first_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']} (સ્ટેટસ: {x['સ્ટેટસ']})", axis=1), key="fa_select")
         rti_id = selected_rti.split(" - ")[0].replace("ID: ", "").strip()
@@ -282,13 +277,13 @@ with tab2:
             
             if st.form_submit_button("SAVE FIRST APPEAL"):
                 r_idx = df[df['ID'] == rti_id].index[0]
-                df.at[r_idx, 'FAA_તારીખ'] = faa_date
-                df.at[r_idx, 'FAA_સુનાવણી_તારીખ'] = faa_hearing
-                df.at[r_idx, 'FAA_અધિકારી'] = faa_name
-                df.at[r_idx, 'FAA_સરનામું'] = faa_address
-                df.at[r_idx, 'FAA_પિનકોડ'] = faa_pin
-                df.at[r_idx, 'FAA_મોબાઈલ'] = faa_mob
-                df.at[r_idx, 'FAA_સ્પીડપોસ્ટ'] = faa_speed
+                df.at[r_idx, 'FAA_તારીખ'] = str(faa_date)
+                df.at[r_idx, 'FAA_સુનાવણી_તારીખ'] = str(faa_hearing)
+                df.at[r_idx, 'FAA_અધિકારી'] = str(faa_name)
+                df.at[r_idx, 'FAA_સરનામું'] = str(faa_address)
+                df.at[r_idx, 'FAA_પિનકોડ'] = str(faa_pin)
+                df.at[r_idx, 'FAA_મોબાઈલ'] = str(faa_mob)
+                df.at[r_idx, 'FAA_સ્પીડપોસ્ટ'] = str(faa_speed)
                 if faa_file is not None:
                     df.at[r_idx, 'FAA_ફાઈલ'] = save_uploaded_file(faa_file)
                 df.at[r_idx, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
@@ -296,11 +291,11 @@ with tab2:
                 st.success("પ્રથમ અપીલ સફળતાપૂર્વક સેવ થઈ ગઈ છે!")
                 st.rerun()
     else: 
-        st.info("કોઈ અરજી પ્રથમ અપીલ માટે ઉપલબ્ધ નથી.")
+        st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
 
 with tab3:
     st.subheader("🏛️ બીજી અપીલ (ગુજરાત માહિતી આયોગ) વિગતો")
-    second_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ પેન્ડિંગ', 'બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    second_rtis = user_df[user_df['સ્ટેટસ'] != 'નિકાલ'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
     if not second_rtis.empty:
         selected_sa = st.selectbox("અરજી પસંદ કરો", second_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']} (સ્ટેટસ: {x['સ્ટેટસ']})", axis=1), key="sa_select")
         sa_id = selected_sa.split(" - ")[0].replace("ID: ", "").strip()
@@ -322,9 +317,9 @@ with tab3:
             
             if st.form_submit_button("SAVE SECOND APPEAL"):
                 r_idx = df[df['ID'] == sa_id].index[0]
-                df.at[r_idx, 'SA_તારીખ'] = sa_date
-                df.at[r_idx, 'SA_સુનાવણી_તારીખ'] = sa_hearing
-                df.at[r_idx, 'SA_સ્પીડપોસ્ટ'] = sa_speed
+                df.at[r_idx, 'SA_તારીખ'] = str(sa_date)
+                df.at[r_idx, 'SA_સુનાવણી_તારીખ'] = str(sa_hearing)
+                df.at[r_idx, 'SA_સ્પીડપોસ્ટ'] = str(sa_speed)
                 if sa_file is not None:
                     df.at[r_idx, 'SA_ફાઈલ'] = save_uploaded_file(sa_file)
                 df.at[r_idx, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
@@ -332,7 +327,7 @@ with tab3:
                 st.success("બીજી અપીલ સફળતાપૂર્વક સેવ થઈ ગઈ છે!")
                 st.rerun()
     else: 
-        st.info("કોઈ અરજી બીજી અપીલ માટે ઉપલબ્ધ નથી.")
+        st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
 
 # TAB 4: મેનેજમેન્ટ, એડિટ અને ડિલીટ ઓપ્શન
 with tab4:
@@ -364,7 +359,10 @@ with tab4:
                 
                 if update_btn:
                     r_idx = df[df['ID'] == edit_id].index[0]
-                    df.at[r_idx, 'PIO_કચેરી'], df.at[r_idx, 'PIO_સરનામું'], df.at[r_idx, 'RTI_સ્પીડપોસ્ટ'], df.at[r_idx, 'PIO_મોબાઈલ'] = ed_pio, ed_addr, ed_speed, ed_mob
+                    df.at[r_idx, 'PIO_કચેરી'] = str(ed_pio)
+                    df.at[r_idx, 'PIO_સરનામું'] = str(ed_addr)
+                    df.at[r_idx, 'RTI_સ્પીડપોસ્ટ'] = str(ed_speed)
+                    df.at[r_idx, 'PIO_મોબાઈલ'] = str(ed_mob)
                     df.to_csv(DATA_FILE, index=False)
                     st.success("માહિતી સફળતાપૂર્વક અપડેટ થઈ ગઈ છે!")
                     st.rerun()
@@ -473,7 +471,7 @@ st.subheader("તમારી અરજીઓનું લિસ્ટ અને
 list_tab1, list_tab2, list_tab3 = st.tabs(["આખી યાદી (All)", "પેન્ડિંગ અરજીઓ", "નિકાલ થયેલ"])
 
 with list_tab1: render_professional_table(filtered_df, "all")
-with list_tab2: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'] == 'પેન્ડિંગ'] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "pending")
+with list_tab2: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'] != 'નિકાલ'] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "pending")
 with list_tab3: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'] == 'નિકાલ'] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "nikal")
 
 st.markdown("<br>", unsafe_allow_html=True)
