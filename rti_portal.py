@@ -211,7 +211,7 @@ with r2_c3: st.markdown(f'<div class="box b-green"><p class="label-text">નિ�
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- ફિલ્ટરિંગ માટે સુંદર ડ્રોપડાઉન ---
+# --- પાવરફુલ ફિલ્ટર ડ્રોપડાઉન ---
 filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"])
 
 if not user_df.empty:
@@ -488,7 +488,7 @@ def render_professional_table(df_subset, tab_key):
                 st.rerun()
 
 st.markdown("---")
-st.subheader("તમારી અરજીઓનું લિસ્ટ")
+st.subheader(f"તમારી અરજીઓનું લિસ્ટ (ફિલ્ટર: {filter_option})")
 render_professional_table(filtered_df, "main_list")
 
 st.markdown("<br>", unsafe_allow_html=True)
