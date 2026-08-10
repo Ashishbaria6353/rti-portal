@@ -15,13 +15,20 @@ header {visibility: hidden;}
 .block-container { background-color: #f8f9fa; border: 2px solid #cfd8dc; border-radius: 12px; padding: 1.5rem 1rem !important; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-top: 1rem; }
 button[kind="primary"] { background: linear-gradient(to right, #e53935, #ef5350) !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; border: none !important; }
 div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to right, #1976d2, #42a5f5) !important; }
-.box { padding: 8px; border-radius: 8px; text-align: center; color: white; font-family: sans-serif; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin-bottom: 8px; }
-.blue-box { background: linear-gradient(to right, #3b5998, #4c70ba); }
-.green-box { background: linear-gradient(to right, #4CAF50, #66bb6a); }
-.red-box { background: linear-gradient(to right, #f44336, #ef5350); }
-.orange-box { background: linear-gradient(to right, #ff9800, #ffb74d); }
-.purple-box { background: linear-gradient(to right, #9c27b0, #ba68c8); }
-.number-text { font-size: 22px; font-weight: bold; margin: 0; }
+
+/* ૭ બોક્સ માટેના તદ્દન અલગ અને યુનિક કલર્સ */
+.box { padding: 14px 10px; border-radius: 10px; text-align: center; color: white; font-family: sans-serif; box-shadow: 0px 4px 8px rgba(0,0,0,0.15); margin-bottom: 12px; }
+.b-blue { background: linear-gradient(to right, #1976d2, #42a5f5); }          /* કુલ RTI: વાદળી */
+.b-orange { background: linear-gradient(to right, #f57c00, #ffa726); }       /* પેન્ડિંગ: ઓરેન્જ */
+.b-brown { background: linear-gradient(to right, #4e342e, #6d4c41); }        /* પ્રથમ અપીલ બાકી: ઘાટો ચોકલેટી (બ્રાઉન) */
+.b-red { background: linear-gradient(to right, #d32f2f, #ef5350); }          /* પ્રથમ અપીલ: લાલ */
+.b-purple { background: linear-gradient(to right, #7b1fa2, #ab47bc); }       /* બીજી અપીલ બાકી: પર્પલ */
+.b-deeppurple { background: linear-gradient(to right, #311b92, #5e35b1); }   /* બીજી અપીલ: ઘાટો જાંબલી */
+.b-green { background: linear-gradient(to right, #388e3c, #66bb6a); }         /* નિકાલ: લીલો */
+
+.number-text { font-size: 26px; font-weight: bold; margin: 4px 0 0 0; }
+.label-text { font-size: 14px; font-weight: 600; margin: 0; }
+
 .table-header { background-color: #3b5998; color: white; padding: 8px; border-radius: 6px; font-weight: bold; text-align: center; margin-bottom: 6px; font-size: 13px; }
 .table-row { background-color: white; padding: 8px; border-radius: 6px; border: 1px solid #cfd8dc; text-align: center; margin-bottom: 6px; font-size: 13px; }
 </style>
@@ -125,7 +132,7 @@ extra_docs_df = load_extra_docs()
 if not user_df.empty and 'સ્ટેટસ' not in user_df.columns:
     user_df['સ્ટેટસ'] = 'પેન્ડિંગ'
 
-# --- ઓટોમેટિક લોજિક (૩૦ અને ૪૫ દિવસ ચેક કરવા માટે) ---
+# --- ઓટોમેટિક લોજિક ---
 if not user_df.empty:
     today = date.today()
     changed = False
@@ -133,13 +140,11 @@ if not user_df.empty:
         real_index = df[df['ID'] == row['ID']].index[0]
         status_val = str(row.get('સ્ટેટસ', 'પેન્ડિંગ'))
         
-        # જો પેન્ડિંગ હોય અને ૩૦ દિવસ વીતી ગયા હોય અને પ્રથમ અપીલની તારીખ ન નાખી હોય
         if status_val == 'પેન્ડિંગ' and pd.notna(row.get('RTI_તારીખ')):
             if (today - row['RTI_તારીખ']).days > 30 and not str(row.get('FAA_તારીખ', '')):
                 df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ બાકી'
                 changed = True
                 
-        # જો પ્રથમ અપીલ પેન્ડિંગ હોય અને અપીલ તારીખથી ૪૫ દિવસ વીતી ગયા હોય
         elif status_val == 'પ્રથમ અપીલ પેન્ડિંગ' and pd.notna(row.get('FAA_તારીખ')):
             if (today - row['FAA_તારીખ']).days > 45 and not str(row.get('SA_તારીખ', '')):
                 df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ બાકી'
@@ -167,23 +172,32 @@ if not user_df.empty and search_term:
 else:
     filtered_df = user_df
 
+# --- કાઉન્ટર ડેટા મેળવો ---
 total_rti = len(user_df) if not user_df.empty else 0
 pending_rti = len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
-first_appeal_count = len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
-second_appeal_count = len(user_df[user_df["સ્ટેટસ"].isin(["બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+first_due = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+first_done = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+second_due = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+second_done = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 
-c1, c2, c3, c4, c5 = st.columns(5)
-with c1: st.markdown(f'<div class="box blue-box"><small>કુલ RTI</small><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="box orange-box"><small>પેન્ડિંગ</small><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
-with c3: st.markdown(f'<div class="box red-box"><small>પ્રથમ અપીલ</small><p class="number-text">{first_appeal_count}</p></div>', unsafe_allow_html=True)
-with c4: st.markdown(f'<div class="box purple-box"><small>બીજી અપીલ</small><p class="number-text">{second_appeal_count}</p></div>', unsafe_allow_html=True)
-with c5: st.markdown(f'<div class="box green-box"><small>નિકાલ</small><p class="number-text">{nikal_rti}</p></div>', unsafe_allow_html=True)
+# --- ઉપર 4 બોક્સ ---
+r1_c1, r1_c2, r1_c3, r1_c4 = st.columns(4)
+with r1_c1: st.markdown(f'<div class="box b-blue"><p class="label-text">કુલ RTI</p><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
+with r1_c2: st.markdown(f'<div class="box b-orange"><p class="label-text">પેન્ડિંગ</p><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
+with r1_c3: st.markdown(f'<div class="box b-brown"><p class="label-text">પ્રથમ અપીલ બાકી</p><p class="number-text">{first_due}</p></div>', unsafe_allow_html=True)
+with r1_c4: st.markdown(f'<div class="box b-red"><p class="label-text">પ્રથમ અપીલ</p><p class="number-text">{first_done}</p></div>', unsafe_allow_html=True)
+
+# --- નીચે 3 બોક્સ ---
+r2_c1, r2_c2, r2_c3 = st.columns(3)
+with r2_c1: st.markdown(f'<div class="box b-purple"><p class="label-text">બીજી અપીલ બાકી</p><p class="number-text">{second_due}</p></div>', unsafe_allow_html=True)
+with r2_c2: st.markdown(f'<div class="box b-deeppurple"><p class="label-text">બીજી અપીલ</p><p class="number-text">{second_done}</p></div>', unsafe_allow_html=True)
+with r2_c3: st.markdown(f'<div class="box b-green"><p class="label-text">નિકાલ</p><p class="number-text">{nikal_rti}</p></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- ટેબ્સની નવી ગોઠવણી ---
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🆕 નવી RTI", "⚠️ પ્રથમ અપીલ બાકી", "⚖️ પ્રથમ અપીલ", "⚠️ બીજી અપીલ બાકી", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & ડિલીટ"])
+# --- સાફ અને સરળ ટેબ્સ ---
+tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & ડિલીટ"])
 
 with tab1:
     with st.form("new_rti_form", clear_on_submit=True):
@@ -217,24 +231,10 @@ with tab1:
             st.rerun()
 
 with tab2:
-    st.subheader("⚠️ જે RTI ની અપીલ કરવાનો સમય થઈ ગયો છે")
-    due_first = user_df[user_df['સ્ટેટસ'] == 'પ્રથમ અપીલ બાકી'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
-    if not due_first.empty:
-        for i, row in due_first.iterrows():
-            st.markdown(f"""
-            <div style="background: white; padding: 12px; border-left: 5px solid #ff9800; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                <b>ID:</b> {row['ID']} | <b>કચેરી:</b> {row['PIO_કચેરી']} | <b>RTI તારીખ:</b> {row['RTI_તારીખ']} <br>
-                <span style="color: #d32f2f; font-weight: bold;">૩૦ દિવસ પૂરા થઈ ગયા છે, પ્રથમ અપીલ કરવાની બાકી છે!</span>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("કોઈ અરજી પ્રથમ અપીલ બાકીમાં નથી.")
-
-with tab3:
     st.subheader("⚖️ પ્રથમ અપીલની વિગતો અને સુનાવણી તારીખ")
-    first_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    first_rtis = user_df[user_df['સ્ટેટસ'].isin(['પેન્ડિંગ', 'પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટस' in user_df.columns else pd.DataFrame()
     if not first_rtis.empty:
-        selected_rti = st.selectbox("RTI પસંદ કરો", first_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1), key="fa_select")
+        selected_rti = st.selectbox("RTI પસંદ કરો", first_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']} (સ્ટેટસ: {x['સ્ટેટસ']})", axis=1), key="fa_select")
         rti_id = selected_rti.split(" - ")[0].replace("ID: ", "").strip()
         e_row = user_df[user_df['ID'] == rti_id].iloc[0]
         
@@ -273,25 +273,11 @@ with tab3:
     else: 
         st.info("કોઈ અરજી પ્રથમ અપીલ માટે ઉપલબ્ધ નથી.")
 
-with tab4:
-    st.subheader("⚠️ જે પ્રથમ અપીલના ૪૫ દિવસ પૂરા થઈ ગયા છે")
-    due_second = user_df[user_df['સ્ટેટસ'] == 'બીજી અપીલ બાકી'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
-    if not due_second.empty:
-        for i, row in due_second.iterrows():
-            st.markdown(f"""
-            <div style="background: white; padding: 12px; border-left: 5px solid #9c27b0; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
-                <b>ID:</b> {row['ID']} | <b>કચેરી:</b> {row['PIO_કચેરી']} | <b>અપીલ તારીખ:</b> {row['FAA_તારીખ']} <br>
-                <span style="color: #9c27b0; font-weight: bold;">૪૫ દિવસ પૂરા થઈ ગયા છે, ગુજરાત માહિતી આયોગમાં બીજી અપીલ કરવાની બાકી છે!</span>
-            </div>
-            """, unsafe_allow_html=True)
-    else:
-        st.info("કોઈ અરજી બીજી અપીલ બાકીમાં નથી.")
-
-with tab5:
+with tab3:
     st.subheader("🏛️ બીજી અપીલ (ગુજરાત માહિતી આયોગ) વિગતો")
-    second_rtis = user_df[user_df['સ્ટેટસ'].isin(['બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    second_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ પેન્ડિંગ', 'બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
     if not second_rtis.empty:
-        selected_sa = st.selectbox("અરજી પસંદ કરો", second_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1), key="sa_select")
+        selected_sa = st.selectbox("અરજી પસંદ કરો", second_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']} (સ્ટેટસ: {x['સ્ટેટસ']})", axis=1), key="sa_select")
         sa_id = selected_sa.split(" - ")[0].replace("ID: ", "").strip()
         e_row_sa = user_df[user_df['ID'] == sa_id].iloc[0]
         
@@ -323,8 +309,8 @@ with tab5:
     else: 
         st.info("કોઈ અરજી બીજી અપીલ માટે ઉપલબ્ધ નથી.")
 
-# TAB 6: મેનેજમેન્ટ, એડિટ અને ડિલીટ ઓપ્શન
-with tab6:
+# TAB 4: મેનેજમેન્ટ, એડિટ અને ડિલીટ ઓપ્શન
+with tab4:
     st.subheader("📊 એક્સેલ રિપોર્ટ ડાઉનલોડ કરો")
     csv = filtered_df.to_csv(index=False).encode('utf-8-sig') if not filtered_df.empty else ""
     st.download_button(label="📥 તમારો ડેટા એક્સેલમાં ડાઉનલોડ કરો", data=csv, file_name="RTI_Report.csv", mime="text/csv")
@@ -428,7 +414,7 @@ if st.session_state['manage_action_id']:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# પ્રોફેશનल ટેબલ ફોર્મેટ (મુખ્ય યાદી)
+# પ્રોફેશનલ ટેબલ ફોર્મેટ (મુખ્ય યાદી)
 # ==========================================
 def render_professional_table(df_subset, tab_key):
     if df_subset.empty:
