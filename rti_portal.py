@@ -2,10 +2,11 @@ import streamlit as st
 import pandas as pd
 from datetime import date
 import os
+import base64
 
 st.set_page_config(page_title="RTI Manage Portal", layout="wide")
 
-# --- Streamlit ના ડિફોલ્ટ વોટરમાર્ક/મેનૂ છુપાવવા માટેની CSS ---
+# --- Streamlit ના ડિફોલ્ટ વોટરમાર્ક/મેનૂ છુપાવવા અને લેઆઉટ સેટ કરવા માટેની CSS ---
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
@@ -14,18 +15,19 @@ header {visibility: hidden;}
 .block-container { background-color: #f8f9fa; border: 2px solid #cfd8dc; border-radius: 12px; padding: 1.5rem 1rem !important; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-top: 1rem; }
 button[kind="primary"] { background: linear-gradient(to right, #e53935, #ef5350) !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; border: none !important; }
 div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to right, #1976d2, #42a5f5) !important; }
-.box { padding: 12px; border-radius: 8px; text-align: center; color: white; font-family: sans-serif; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin-bottom: 8px; }
+.box { padding: 10px; border-radius: 8px; text-align: center; color: white; font-family: sans-serif; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin-bottom: 8px; }
 .blue-box { background: linear-gradient(to right, #3b5998, #4c70ba); }
 .green-box { background: linear-gradient(to right, #4CAF50, #66bb6a); }
 .red-box { background: linear-gradient(to right, #f44336, #ef5350); }
 .orange-box { background: linear-gradient(to right, #ff9800, #ffb74d); }
 .purple-box { background: linear-gradient(to right, #9c27b0, #ba68c8); }
-.number-text { font-size: 28px; font-weight: bold; margin: 0; }
-.mobile-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #b0bec5; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+.number-text { font-size: 24px; font-weight: bold; margin: 0; }
+.table-header { background-color: #3b5998; color: white; padding: 8px; border-radius: 6px; font-weight: bold; text-align: center; margin-bottom: 6px; font-size: 14px; }
+.table-row { background-color: white; padding: 8px; border-radius: 6px; border: 1px solid #cfd8dc; text-align: center; margin-bottom: 6px; font-size: 14px; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- પરમેનન્ટ લૉગિન સિસ્ટમ (રિફ્રેશ કરવાથી લૉગિન જતું ન રહે તે માટે) ---
+# --- પરમેનન્ટ લૉગિન સિસ્ટમ (નામ અને મોબાઈલ નંબર દ્વારા) ---
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
 if 'user_name' not in st.session_state:
@@ -35,7 +37,6 @@ if 'user_mobile' not in st.session_state:
 if 'manage_action_id' not in st.session_state:
     st.session_state['manage_action_id'] = None
 
-# કુકી દ્વારા લૉગિન સેવ રાખવા માટે query params નો ઉપયોગ
 params = st.query_params
 if "mobile" in params and not st.session_state['logged_in']:
     st.session_state['logged_in'] = True
@@ -44,8 +45,9 @@ if "mobile" in params and not st.session_state['logged_in']:
         st.session_state['user_name'] = params["name"]
 
 if not st.session_state['logged_in']:
-    st.markdown("<h2 style='text-align: center; color: #1e3a8a; margin-top: 50px;'>RTI MANAGE PORTAL</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: gray;'>કૃપા કરીને આગળ વધવા માટે લૉગિન કરો</p>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #1e3a8a; margin-top: 30px;'>RTI MANAGE PORTAL</h2>", unsafe_allow_html=True)
+    st.markdown("<h4 style='text-align: center; color: #2e7d32; margin-bottom: 5px;'>👋 આપનું સ્વાગત છે!</h4>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: gray;'>કૃપા કરીને આગળ વધવા માટે નામ અને મોબાઈલ નંબર દાખલ કરો</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
@@ -91,20 +93,25 @@ def save_uploaded_file(uploaded_file):
     return "ફાઈલ નથી"
 
 def load_data():
+    cols = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
+            'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_તારીખ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
+            'SA_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
     if os.path.exists(DATA_FILE):
-        df = pd.read_csv(DATA_FILE, dtype=str)
-        for col in df.columns:
-            if 'સ્ટેટ' in col or 'status' in col.lower():
-                df.rename(columns={col: 'સ્ટેટસ'}, inplace=True)
-        if 'સ્ટેટસ' not in df.columns:
-            df['સ્ટેટસ'] = 'પેન્ડિંગ'
-        df['RTI_તારીખ'] = pd.to_datetime(df['RTI_તારીખ'], errors='coerce').dt.date
-        df['FAA_તારીખ'] = pd.to_datetime(df['FAA_તારીખ'], errors='coerce').dt.date
-        return df
+        try:
+            df = pd.read_csv(DATA_FILE, dtype=str)
+            if df.empty or 'RTI_તારીખ' not in df.columns:
+                return pd.DataFrame(columns=cols)
+            for col in df.columns:
+                if 'સ્ટેટ' in col or 'status' in col.lower():
+                    df.rename(columns={col: 'સ્ટેટસ'}, inplace=True)
+            if 'સ્ટેટસ' not in df.columns:
+                df['સ્ટેટસ'] = 'પેન્ડિંગ'
+            df['RTI_તારીખ'] = pd.to_datetime(df['RTI_તારીખ'], errors='coerce').dt.date
+            df['FAA_તારીખ'] = pd.to_datetime(df['FAA_તારીખ'], errors='coerce').dt.date
+            return df
+        except Exception:
+            return pd.DataFrame(columns=cols)
     else:
-        cols = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
-                'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_તારીખ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
-                'SA_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
         return pd.DataFrame(columns=cols)
 
 def load_extra_docs():
@@ -113,10 +120,10 @@ def load_extra_docs():
     return pd.DataFrame(columns=['ID', 'Doc_Name', 'File_Path'])
 
 df = load_data()
-user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy()
+user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy() if not df.empty and 'User_Mobile' in df.columns else pd.DataFrame()
 extra_docs_df = load_extra_docs()
 
-if 'સ્ટેટસ' not in user_df.columns:
+if not user_df.empty and 'સ્ટેટસ' not in user_df.columns:
     user_df['સ્ટેટસ'] = 'પેન્ડિંગ'
 
 # --- ઓટોમેટિક લોજિક ---
@@ -138,30 +145,36 @@ if not user_df.empty:
         df.to_csv(DATA_FILE, index=False)
         user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy()
 
-# --- ટોચ પર Home બટન, ટાઇટલ અને સર્ચ ઓપ્શન ---
+# --- ટોચ પર Home બટન, મુખ્ય હેડિંગ અને સર્ચ ઓપ્શન ---
 col_home, col_title, col_search = st.columns([0.8, 1.7, 1.5])
 with col_home:
     if st.button("Home", use_container_width=True):
         st.session_state['manage_action_id'] = None
         st.rerun()
 with col_title:
-    st.markdown("<h3 style='color: #1e3a8a; font-weight: bold; margin:0;'>RTI PORTAL</h3>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e3a8a; font-weight: bold; margin:0;'>RTI MANAGE PORTAL</h3>", unsafe_allow_html=True)
 with col_search:
     search_term = st.text_input("🔍 શોધો:", placeholder="ID કે કચેરી...", label_visibility="collapsed")
 
 st.markdown("<hr style='border: 1px solid #cfd8dc; margin: 10px 0;'>", unsafe_allow_html=True)
 
-if search_term:
+if not user_df.empty and search_term:
     filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
 else:
     filtered_df = user_df
 
+total_rti = len(user_df) if not user_df.empty else 0
+pending_rti = len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+first_appeal = len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+second_appeal = len(user_df[user_df["સ્ટેટસ"].isin(["બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+
 c1, c2, c3, c4, c5 = st.columns(5)
-with c1: st.markdown(f'<div class="box blue-box"><small>કુલ RTI</small><p class="number-text">{len(user_df)}</p></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="box orange-box"><small>પેન્ડિંગ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"])}</p></div>', unsafe_allow_html=True)
-with c3: st.markdown(f'<div class="box red-box"><small>પ્રથમ અપીલ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ"])])}</p></div>', unsafe_allow_html=True)
-with c4: st.markdown(f'<div class="box purple-box"><small>બીજી અપીલ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"].isin(["બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])])}</p></div>', unsafe_allow_html=True)
-with c5: st.markdown(f'<div class="box green-box"><small>નિકાલ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"])}</p></div>', unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="box blue-box"><small>કુલ RTI</small><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="box orange-box"><small>પેન્ડિંગ</small><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="box red-box"><small>પ્રથમ અપીલ</small><p class="number-text">{first_appeal}</p></div>', unsafe_allow_html=True)
+with c4: st.markdown(f'<div class="box purple-box"><small>બીજી અપીલ</small><p class="number-text">{second_appeal}</p></div>', unsafe_allow_html=True)
+with c5: st.markdown(f'<div class="box green-box"><small>નિકાલ</small><p class="number-text">{nikal_rti}</p></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -199,7 +212,7 @@ with tab1:
             st.rerun()
 
 with tab2:
-    pending_rtis = user_df[user_df['સ્ટેટસ'].isin(['પેન્ડિંગ', 'પ્રથમ અપીલ બાકી'])]
+    pending_rtis = user_df[user_df['સ્ટેટસ'].isin(['પેન્ડિંગ', 'પ્રથમ અપીલ બાકી'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
     if not pending_rtis.empty:
         selected_rti = st.selectbox("RTI પસંદ કરો", pending_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
         rti_id = selected_rti.split(" - ")[0].replace("ID: ", "").strip()
@@ -223,7 +236,7 @@ with tab2:
     else: st.info("કોઈ અરજી પ્રથમ અપીલ માટે બાકી નથી.")
 
 with tab3:
-    appeal_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ પેન્ડિંગ', 'બીજી અપીલ બાકી'])]
+    appeal_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ પેન્ડિંગ', 'બીજી અપીલ બાકી'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
     if not appeal_rtis.empty:
         selected_sa = st.selectbox("અરજી પસંદ કરો", appeal_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
         sa_id = selected_sa.split(" - ")[0].replace("ID: ", "").strip()
@@ -246,7 +259,7 @@ with tab3:
 # TAB 4: મેનેજમેન્ટ, એડિટ અને ડિલીટ ઓપ્શન
 with tab4:
     st.subheader("📊 એક્સેલ રિપોર્ટ ડાઉનલોડ કરો")
-    csv = filtered_df.to_csv(index=False).encode('utf-8-sig')
+    csv = filtered_df.to_csv(index=False).encode('utf-8-sig') if not filtered_df.empty else ""
     st.download_button(label="📥 તમારો ડેટા એક્સેલમાં ડાઉનલોડ કરો", data=csv, file_name="RTI_Report.csv", mime="text/csv")
     
     st.markdown("---")
@@ -289,7 +302,7 @@ with tab4:
 # ==========================================
 if st.session_state['manage_action_id']:
     real_m_id = st.session_state['manage_action_id']
-    m_row_data = user_df[user_df['ID'] == real_m_id]
+    m_row_data = user_df[user_df['ID'] == real_m_id] if not user_df.empty and 'ID' in user_df.columns else pd.DataFrame()
     
     if not m_row_data.empty:
         m_row = m_row_data.iloc[0]
@@ -302,26 +315,35 @@ if st.session_state['manage_action_id']:
                 st.rerun()
         
         st.markdown("<br>", unsafe_allow_html=True)
-        st.write("**મૂળ અરજીઓ:**")
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            if pd.notna(m_row.get('RTI_ફાઈલ')) and str(m_row['RTI_ફાઈલ']) != "ફાઈલ નથી" and os.path.exists(str(m_row['RTI_ફાઈલ'])):
-                with open(str(m_row['RTI_ફાઈલ']), "rb") as f: st.download_button("⬇️ RTI ફાઈલ", f, file_name=f"RTI_{real_m_id}.pdf")
-        with c2:
-            if pd.notna(m_row.get('FAA_ફાઈલ')) and str(m_row['FAA_ફાઈલ']) != "ફાઈલ નથી" and os.path.exists(str(m_row['FAA_ફાઈલ'])):
-                with open(str(m_row['FAA_ફાઈલ']), "rb") as f: st.download_button("⬇️ પ્રથમ અપીલ ફાઈલ", f, file_name=f"FAA_{real_m_id}.pdf")
-        with c3:
-            if pd.notna(m_row.get('SA_ફાઈલ')) and str(m_row['SA_ફાઈલ']) != "ફાઈલ નથી" and os.path.exists(str(m_row['SA_ફાઈલ'])):
-                with open(str(m_row['SA_ફાઈલ']), "rb") as f: st.download_button("⬇️ બીજી અપીલ ફાઈલ", f, file_name=f"SA_{real_m_id}.pdf")
+        st.write("**મૂળ અરજીઓ (બ્રાઉઝરમાં જુઓ અથવા ડાઉનલોડ કરો):**")
         
-        st.markdown("---")
+        def display_file_options(file_path, label_name):
+            if pd.notna(file_path) and str(file_path) != "ફાઈલ નથી" and os.path.exists(str(file_path)):
+                st.markdown(f"**{label_name}**")
+                col_v, col_d = st.columns(2)
+                with col_v:
+                    if st.button(f"👁️ વ્યુ (View) {label_name}", key=f"view_{file_path}_{label_name}"):
+                        with open(file_path, "rb") as f:
+                            base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+                        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500px" type="application/pdf"></iframe>'
+                        st.markdown(pdf_display, unsafe_allow_html=True)
+                with col_d:
+                    with open(file_path, "rb") as f:
+                        st.download_button(f"⬇️ ડાઉનલોડ {label_name}", f, file_name=os.path.basename(file_path), key=f"dl_{file_path}_{label_name}")
+                st.markdown("---")
+
+        display_file_options(m_row.get('RTI_ફાઈલ'), "RTI ફાઈલ")
+        display_file_options(m_row.get('FAA_ફાઈલ'), "પ્રથમ અપીલ ફાઈલ")
+        display_file_options(m_row.get('SA_ફાઈલ'), "બીજી અપીલ ફાઈલ")
+        
         st.write("**આ કેસના અન્ય પત્રો/દસ્તાવેજો:**")
-        case_docs = extra_docs_df[extra_docs_df['ID'] == real_m_id]
+        case_docs = extra_docs_df[extra_docs_df['ID'] == real_m_id] if not extra_docs_df.empty and 'ID' in extra_docs_df.columns else pd.DataFrame()
         if not case_docs.empty:
             for i, doc_row in case_docs.iterrows():
                 if os.path.exists(str(doc_row['File_Path'])):
-                    with open(str(doc_row['File_Path']), "rb") as f: st.download_button(f"⬇️ {doc_row['Doc_Name']}", f, file_name=f"Doc_{real_m_id}_{i}.pdf", key=f"btn_{i}")
-        else: st.info("કોઈ વધારાનો પત્ર અપલોડ કરેલ નથી.")
+                    display_file_options(doc_row['File_Path'], doc_row['Doc_Name'])
+        else: 
+            st.info("કોઈ વધારાનો પત્ર અપલોડ કરેલ નથી.")
         
         with st.form(f"upload_extra_{real_m_id}", clear_on_submit=True):
             st.write("**નવો પત્ર/દસ્તાવેજ અપલોડ કરો:**")
@@ -339,44 +361,46 @@ if st.session_state['manage_action_id']:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# મોબાઈલ અને ડેસ્કટોપ ફ્રેંડલી રિસ્પોન્સિવ લિસ્ટ
+# પ્રોફેશનલ ટેબલ ફોર્મેટ
 # ==========================================
-def render_responsive_table(df_subset, tab_key):
+def render_professional_table(df_subset, tab_key):
     if df_subset.empty:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
         return
     
+    h1, h2, h3, h4, h5, h6 = st.columns([0.6, 1.2, 1.8, 2.2, 1.4, 1.4])
+    with h1: st.markdown('<div class="table-header">Sr.</div>', unsafe_allow_html=True)
+    with h2: st.markdown('<div class="table-header">ID</div>', unsafe_allow_html=True)
+    with h3: st.markdown('<div class="table-header">Applicant</div>', unsafe_allow_html=True)
+    with h4: st.markdown('<div class="table-header">PIO Office</div>', unsafe_allow_html=True)
+    with h5: st.markdown('<div class="table-header">Date</div>', unsafe_allow_html=True)
+    with h6: st.markdown('<div class="table-header">Action</div>', unsafe_allow_html=True)
+    
     for i, (index, row) in enumerate(df_subset.iterrows()):
         dt = row.get('RTI_તારીખ', '-')
-        status = row.get('સ્ટેટસ', '-')
-        color = "#d32f2f" if "પેન્ડિંગ" in str(status) or "બાકી" in str(status) else "#2e7d32"
         
-        # મોબાઈલ માટે કાર્ડ ડિઝાઈન અને ડેસ્કટોપ માટે પ્રોપર લિસ્ટ
-        st.markdown(f"""
-        <div class="mobile-card">
-            <b>ક્રમ:</b> {i+1} | <b>ID:</b> {row['ID']}<br>
-            <b>કચેરી:</b> {row.get('PIO_કચેરી', '-')}<br>
-            <b>તારીખ:</b> {dt}<br>
-            <b>સ્ટેટસ:</b> <span style="color: {color}; font-weight: bold;">{status}</span>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        if st.button("👁️ જુઓ / 📤 અપલોડ", key=f"btn_{row['ID']}_{tab_key}", use_container_width=True):
-            st.session_state['manage_action_id'] = row['ID']
-            st.rerun()
-        st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
+        r1, r2, r3, r4, r5, r6 = st.columns([0.6, 1.2, 1.8, 2.2, 1.4, 1.4])
+        with r1: st.markdown(f'<div class="table-row"><b>{i+1}</b></div>', unsafe_allow_html=True)
+        with r2: st.markdown(f'<div class="table-row"><b>{row["ID"]}</b></div>', unsafe_allow_html=True)
+        with r3: st.markdown(f'<div class="table-row">{st.session_state["user_name"]}</div>', unsafe_allow_html=True)
+        with r4: st.markdown(f'<div class="table-row">{row.get("PIO_કચેરી", "-")}</div>', unsafe_allow_html=True)
+        with r5: st.markdown(f'<div class="table-row">{dt}</div>', unsafe_allow_html=True)
+        with r6:
+            if st.button("👁️ જુઓ", key=f"btn_{row['ID']}_{tab_key}", use_container_width=True):
+                st.session_state['manage_action_id'] = row['ID']
+                st.rerun()
 
 st.markdown("---")
 st.subheader("તમારી અરજીઓનું લિસ્ટ અને નિકાલ")
 list_tab1, list_tab2, list_tab3 = st.tabs(["આખી યાદી (All)", "પ્રથમ અપીલમાં ગયેલી", "બીજી અપીલમાં (આયોગમાં) ગયેલી"])
 
-with list_tab1: render_responsive_table(filtered_df, "all")
-with list_tab2: render_responsive_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])], "first")
-with list_tab3: render_responsive_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])], "second")
+with list_tab1: render_professional_table(filtered_df, "all")
+with list_tab2: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "first")
+with list_tab3: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "second")
 
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("#### ✅ અરજીનો નિકાલ (જવાબ આવી ગયો હોય તો)")
-dispose_rtis = user_df[user_df['સ્ટેટસ'] != 'નિકાલ']
+dispose_rtis = user_df[user_df['સ્ટેટસ'] != 'નિકાલ'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
 if not dispose_rtis.empty:
     dispose_id_str = st.selectbox("નિકાલ કરવા માટે અરજી પસંદ કરો:", dispose_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
     if st.button("આ અરજીનો નિકાલ કરો (Dispose)", type="primary"):
