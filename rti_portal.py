@@ -211,36 +211,36 @@ with r2_c3: st.markdown(f'<div class="box b-green"><p class="label-text">નિ�
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# --- પાવરફુલ ફિલ્ટર ડ્રોપડાઉન ---
-filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"])
-
-if not user_df.empty:
-    if search_term:
-        filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-    else:
-        if filter_option == "પેન્ડિંગ અરજીઓ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
-        elif filter_option == "પ્રથમ અપીલ બાકી":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
-        elif filter_option == "પ્રથમ અપીલ પેન્ડિંગ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]
-        elif filter_option == "બીજી અપીલ બાકી":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
-        elif filter_option == "બીજી અપીલ પેન્ડિંગ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
-        elif filter_option == "નિકાલ થયેલ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
-        else:
-            filtered_df = user_df
-else:
-    filtered_df = pd.DataFrame()
-
-st.markdown("<br>", unsafe_allow_html=True)
-
 # --- ટેબ્સ ---
 tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & ડિલીટ"])
 
 with tab1:
+    # --- ફિલટર ડ્રોપડાઉન હવે "નવી RTI" ટેબની અંદર, ફોર્મની ઉપર ગોઠવ્યું છે ---
+    filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"])
+    
+    if not user_df.empty:
+        if search_term:
+            filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+        else:
+            if filter_option == "પેન્ડિંગ અરજીઓ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
+            elif filter_option == "પ્રથમ અપીલ બાકી":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
+            elif filter_option == "પ્રથમ અપીલ પેન્ડિંગ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]
+            elif filter_option == "બીજી અપીલ બાકી":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
+            elif filter_option == "બીજી અપીલ પેન્ડિંગ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
+            elif filter_option == "નિકાલ થયેલ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
+            else:
+                filtered_df = user_df
+    else:
+        filtered_df = pd.DataFrame()
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
     with st.form("new_rti_form", clear_on_submit=True):
         st.subheader("જાહેર માહિતી અધિકારીશ્રીની વિગતો")
         col_a, col_b = st.columns(2)
@@ -488,7 +488,7 @@ def render_professional_table(df_subset, tab_key):
                 st.rerun()
 
 st.markdown("---")
-st.subheader(f"તમારી અરજીઓનું લિસ્ટ (ફિલ્ટર: {filter_option})")
+st.subheader(f"તમારી અરજીઓનું લિસ્ટ")
 render_professional_table(filtered_df, "main_list")
 
 st.markdown("<br>", unsafe_allow_html=True)
