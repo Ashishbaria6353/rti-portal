@@ -4,15 +4,25 @@ from datetime import date
 import os
 import base64
 import gspread
-from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="RTI Manage Portal", layout="wide")
 
-# --- ગૂગલ શીટ કનેક્શન સેટઅપ ---
+# --- ફાઇનલ અને પરફેક્ટ ગૂગલ શીટ કનેક્શન ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+
+try:
+    # જો એપ Streamlit Cloud (ઓનલાઈન) પર હશે તો Secrets વાપરશે
+    from google.oauth2.service_account import Credentials
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+except:
+    # જો એપ કમ્પ્યુટરમાં હશે તો credentials.json ફાઈલ વાપરશે
+    from oauth2client.service_account import ServiceAccountCredentials
+    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
+
+# --- શાનદાર કલર અને ડિઝાઇન માટેની CSS ---
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
