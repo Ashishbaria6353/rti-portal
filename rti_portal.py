@@ -215,32 +215,6 @@ st.markdown("<br>", unsafe_allow_html=True)
 tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & ડિલીટ"])
 
 with tab1:
-    # --- ફિલટર ડ્રોપડાઉન હવે "નવી RTI" ટેબની અંદર, ફોર્મની ઉપર ગોઠવ્યું છે ---
-    filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"])
-    
-    if not user_df.empty:
-        if search_term:
-            filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-        else:
-            if filter_option == "પેન્ડિંગ અરજીઓ":
-                filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
-            elif filter_option == "પ્રથમ અપીલ બાકી":
-                filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
-            elif filter_option == "પ્રથમ અપીલ પેન્ડિંગ":
-                filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]
-            elif filter_option == "બીજી અપીલ બાકી":
-                filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
-            elif filter_option == "બીજી અપીલ પેન્ડિંગ":
-                filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
-            elif filter_option == "નિકાલ થયેલ":
-                filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
-            else:
-                filtered_df = user_df
-    else:
-        filtered_df = pd.DataFrame()
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
     with st.form("new_rti_form", clear_on_submit=True):
         st.subheader("જાહેર માહિતી અધિકારીશ્રીની વિગતો")
         col_a, col_b = st.columns(2)
@@ -458,8 +432,31 @@ if st.session_state['manage_action_id']:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# પ્રોફેશનલ ટેબલ ફોર્મેટ (મુખ્ય યાદી)
+# પ્રોફેશનલ ટેબલ ફોર્મેટ અને ફિલ્ટર લૉજિક
 # ==========================================
+filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"], key="table_filter_box")
+
+if not user_df.empty:
+    if search_term:
+        filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+    else:
+        if filter_option == "પેન્ડિંગ અરજીઓ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
+        elif filter_option == "પ્રથમ અપીલ બાકી":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
+        elif filter_option == "પ્રથમ અપીલ પેન્ડિંગ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]
+        elif filter_option == "બીજી અપીલ બાકી":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
+        elif filter_option == "બીજી અપીલ પેન્ડિંગ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
+        elif filter_option == "નિકાલ થયેલ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
+        else:
+            filtered_df = user_df
+else:
+    filtered_df = pd.DataFrame()
+
 def render_professional_table(df_subset, tab_key):
     if df_subset.empty:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
@@ -488,12 +485,12 @@ def render_professional_table(df_subset, tab_key):
                 st.rerun()
 
 st.markdown("---")
-st.subheader(f"તમારી અરજીઓનું લિસ્ટ")
+st.subheader(f"તમારી અરજીઓનું લિસ્ટ (ફિલ્ટર: {filter_option})")
 render_professional_table(filtered_df, "main_list")
 
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("#### ✅ અરજીનો નિકાલ (જવાબ આવી ગયો હોય તો)")
-dispose_rtis = user_df[user_df['સ્ટેટસ'] != 'નિકાલ'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+dispose_rtis = user_df[user_df['સ્ટેટస్'] != 'નિકાલ'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
 if not dispose_rtis.empty:
     dispose_id_str = st.selectbox("નિકાલ કરવા માટે અરજી પસંદ કરો:", dispose_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
     if st.button("આ અરજીનો નિકાલ કરો (Dispose)", type="primary"):
