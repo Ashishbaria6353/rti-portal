@@ -327,6 +327,32 @@ with tab3:
 # TAB 4: મેનેજમેન્ટ, એડિટ અને ડિલીટ
 with tab4:
     st.subheader("📊 એક્સેલ રિપોર્ટ ડાઉનલોડ કરો")
+    
+    # --- ફિલટર ડ્રોપડાઉન (અહીં બરાબર "તમારી અરજીઓનું લિસ્ટ" ની ઉપર મૂક્યું છે) ---
+    st.markdown("---")
+    filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"], key="table_filter_box")
+
+    if not user_df.empty:
+        if search_term:
+            filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+        else:
+            if filter_option == "પેન્ડિંગ અરજીઓ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
+            elif filter_option == "પ્રથમ અપીલ બાકી":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
+            elif filter_option == "પ્રથમ અપીલ પેન્ડિંગ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]
+            elif filter_option == "બીજી અપીલ બાકી":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
+            elif filter_option == "બીજી અપીલ પેન્ડિંગ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
+            elif filter_option == "નિકાલ થયેલ":
+                filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
+            else:
+                filtered_df = user_df
+    else:
+        filtered_df = pd.DataFrame()
+
     csv = filtered_df.to_csv(index=False).encode('utf-8-sig') if not filtered_df.empty else ""
     st.download_button(label="📥 તમારો ડેટા એક્સેલમાં ડાઉનલોડ કરો", data=csv, file_name="RTI_Report.csv", mime="text/csv")
     
@@ -432,31 +458,8 @@ if st.session_state['manage_action_id']:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# પ્રોફેશનલ ટેબલ ફોર્મેટ અને ફિલ્ટર લૉજિક
+# પ્રોફેશનલ ટેબલ ફોર્મેટ (મુખ્ય યાદી)
 # ==========================================
-filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"], key="table_filter_box")
-
-if not user_df.empty:
-    if search_term:
-        filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-    else:
-        if filter_option == "પેન્ડિંગ અરજીઓ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
-        elif filter_option == "પ્રથમ અપીલ બાકી":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
-        elif filter_option == "પ્રથમ અપીલ પેન્ડિંગ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]
-        elif filter_option == "બીજી અપીલ બાકી":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
-        elif filter_option == "બીજી અપીલ પેન્ડિંગ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
-        elif filter_option == "નિકાલ થયેલ":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
-        else:
-            filtered_df = user_df
-else:
-    filtered_df = pd.DataFrame()
-
 def render_professional_table(df_subset, tab_key):
     if df_subset.empty:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
@@ -485,17 +488,17 @@ def render_professional_table(df_subset, tab_key):
                 st.rerun()
 
 st.markdown("---")
-st.subheader(f"તમારી અરજીઓનું લિસ્ટ (ફિલ્ટર: {filter_option})")
+st.subheader(f"તમારી અરજીઓનું લિસ્ટ")
 render_professional_table(filtered_df, "main_list")
 
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("#### ✅ અરજીનો નિકાલ (જવાબ આવી ગયો હોય તો)")
-dispose_rtis = user_df[user_df['સ્ટેટస్'] != 'નિકાલ'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+dispose_rtis = user_df[user_df['સ્ટેટસ'] != 'નિકાલ'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
 if not dispose_rtis.empty:
     dispose_id_str = st.selectbox("નિકાલ કરવા માટે અરજી પસંદ કરો:", dispose_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
     if st.button("આ અરજીનો નિકાલ કરો (Dispose)", type="primary"):
         r_idx = df[df['ID'] == dispose_id_str.split(" - ")[0].replace("ID: ", "").strip()].index[0]
-        df.at[r_idx, 'સ્ટેટસ'] = 'નિકાલ'
+        df.at[r_idx, 'સ્ટેટस'] = 'નિકાલ'
         df.to_csv(DATA_FILE, index=False)
         st.success("અરજીનો સફળતાપૂર્વક નિકાલ થઈ ગઈ છે!")
         st.rerun()
