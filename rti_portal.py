@@ -16,8 +16,8 @@ header {visibility: hidden;}
 button[kind="primary"] { background: linear-gradient(to right, #e53935, #ef5350) !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; border: none !important; }
 div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to right, #1976d2, #42a5f5) !important; }
 
-/* ૭ બોક્સ માટેના આકર્ષક અને યુનિક કલર્સ */
-.box { padding: 14px 10px; border-radius: 10px; text-align: center; color: white; font-family: sans-serif; box-shadow: 0px 4px 8px rgba(0,0,0,0.15); margin-bottom: 8px; }
+/* ૭ બોક્સ માટેના આકર્ષક અને યુનિક કલર્સ (કોઈ વધારાના બટન વગર) */
+.box { padding: 14px 10px; border-radius: 10px; text-align: center; color: white; font-family: sans-serif; box-shadow: 0px 4px 8px rgba(0,0,0,0.15); margin-bottom: 12px; }
 .b-blue { background: linear-gradient(to right, #1976d2, #42a5f5); }          /* કુલ RTI */
 .b-orange { background: linear-gradient(to right, #f57c00, #ffa726); }       /* પેન્ડિંગ */
 .b-brown { background: linear-gradient(to right, #4e342e, #6d4c41); }        /* પ્રથમ અપીલ બાકી */
@@ -26,7 +26,7 @@ div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to ri
 .b-deeppurple { background: linear-gradient(to right, #311b92, #5e35b1); }   /* બીજી અપીલ */
 .b-green { background: linear-gradient(to right, #388e3c, #66bb6a); }         /* નિકાલ */
 
-.number-text { font-size: 28px; font-weight: bold; margin: 4px 0 0 0; }
+.number-text { font-size: 26px; font-weight: bold; margin: 4px 0 0 0; }
 .label-text { font-size: 14px; font-weight: 600; margin: 0; }
 
 .table-header { background-color: #3b5998; color: white; padding: 8px; border-radius: 6px; font-weight: bold; text-align: center; margin-bottom: 6px; font-size: 13px; }
@@ -43,8 +43,6 @@ if 'user_mobile' not in st.session_state:
     st.session_state['user_mobile'] = ""
 if 'manage_action_id' not in st.session_state:
     st.session_state['manage_action_id'] = None
-if 'selected_filter' not in st.session_state:
-    st.session_state['selected_filter'] = "All"
 
 params = st.query_params
 if "mobile" in params and not st.session_state['logged_in']:
@@ -181,7 +179,6 @@ col_home, col_title, col_search = st.columns([1, 2, 1.5])
 with col_home:
     if st.button("🏠 Home", use_container_width=True):
         st.session_state['manage_action_id'] = None
-        st.session_state['selected_filter'] = "All"
         st.rerun()
 with col_title:
     st.markdown("<h2 style='text-align: center; color: #1e3a8a; font-weight: bold; margin:0;'>RTI MANAGE PORTAL</h2>", unsafe_allow_html=True)
@@ -189,31 +186,6 @@ with col_search:
     search_term = st.text_input("🔍 સર્ચ કરો:", placeholder="ID, કચેરી કે મોબાઈલ...", label_visibility="collapsed")
 
 st.markdown("<hr style='border: 1px solid #cfd8dc; margin: 10px 0;'>", unsafe_allow_html=True)
-
-# --- ફિલ્ટરિંગ લૉજિક ---
-if not user_df.empty:
-    if search_term:
-        filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
-    else:
-        f_val = st.session_state['selected_filter']
-        if f_val == "All":
-            filtered_df = user_df
-        elif f_val == "Pending":
-            filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
-        elif f_val == "FirstDue":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
-        elif f_val == "FirstDone":
-            filtered_df = user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]
-        elif f_val == "SecondDue":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
-        elif f_val == "SecondDone":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
-        elif f_val == "Nikal":
-            filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
-        else:
-            filtered_df = user_df
-else:
-    filtered_df = pd.DataFrame()
 
 # --- કાઉન્ટર ડેટા મેળવો ---
 total_rti = len(user_df) if not user_df.empty else 0
@@ -224,86 +196,44 @@ second_due = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપ�
 second_done = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 
-# --- ઉપર 4 કલરફુલ બોક્સ (જેના આંકડા પર ક્લિક કરવાથી નીચે ટેબમાં ફિલ્ટર થઈ જશે) ---
+# --- ઉપર 4 કલરફુલ બોક્સ (માત્ર આકર્ષક આંકડા માટે) ---
 r1_c1, r1_c2, r1_c3, r1_c4 = st.columns(4)
-with r1_c1:
-    st.markdown(f'''
-        <div class="box b-blue">
-            <p class="label-text">કુલ RTI</p>
-            <p class="number-text">{total_rti}</p>
-        </div>
-    ''', unsafe_allow_html=True)
-    if st.button("🔍 જુઓ", key="clk_all", use_container_width=True):
-        st.session_state['selected_filter'] = "All"
-        st.rerun()
-
-with r1_c2:
-    st.markdown(f'''
-        <div class="box b-orange">
-            <p class="label-text">પેન્ડિંગ</p>
-            <p class="number-text">{pending_rti}</p>
-        </div>
-    ''', unsafe_allow_html=True)
-    if st.button("🔍 જુઓ", key="clk_pen", use_container_width=True):
-        st.session_state['selected_filter'] = "Pending"
-        st.rerun()
-
-with r1_c3:
-    st.markdown(f'''
-        <div class="box b-brown">
-            <p class="label-text">પ્રથમ અપીલ બાકી</p>
-            <p class="number-text">{first_due}</p>
-        </div>
-    ''', unsafe_allow_html=True)
-    if st.button("🔍 જુઓ", key="clk_fdue", use_container_width=True):
-        st.session_state['selected_filter'] = "FirstDue"
-        st.rerun()
-
-with r1_c4:
-    st.markdown(f'''
-        <div class="box b-red">
-            <p class="label-text">પ્રથમ અપીલ</p>
-            <p class="number-text">{first_done}</p>
-        </div>
-    ''', unsafe_allow_html=True)
-    if st.button("🔍 જુઓ", key="clk_fdone", use_container_width=True):
-        st.session_state['selected_filter'] = "FirstDone"
-        st.rerun()
+with r1_c1: st.markdown(f'<div class="box b-blue"><p class="label-text">કુલ RTI</p><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
+with r1_c2: st.markdown(f'<div class="box b-orange"><p class="label-text">પેન્ડિંગ</p><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
+with r1_c3: st.markdown(f'<div class="box b-brown"><p class="label-text">પ્રથમ અપીલ બાકી</p><p class="number-text">{first_due}</p></div>', unsafe_allow_html=True)
+with r1_c4: st.markdown(f'<div class="box b-red"><p class="label-text">પ્રથમ અપીલ</p><p class="number-text">{first_done}</p></div>', unsafe_allow_html=True)
 
 # --- નીચે 3 કલરફુલ બોક્સ ---
 r2_c1, r2_c2, r2_c3 = st.columns(3)
-with r2_c1:
-    st.markdown(f'''
-        <div class="box b-purple">
-            <p class="label-text">બીજી અપીલ બાકી</p>
-            <p class="number-text">{second_due}</p>
-        </div>
-    ''', unsafe_allow_html=True)
-    if st.button("🔍 જુઓ", key="clk_sdue", use_container_width=True):
-        st.session_state['selected_filter'] = "SecondDue"
-        st.rerun()
+with r2_c1: st.markdown(f'<div class="box b-purple"><p class="label-text">બીજી અપીલ બાકી</p><p class="number-text">{second_due}</p></div>', unsafe_allow_html=True)
+with r2_c2: st.markdown(f'<div class="box b-deeppurple"><p class="label-text">બીજી અપીલ</p><p class="number-text">{second_done}</p></div>', unsafe_allow_html=True)
+with r2_c3: st.markdown(f'<div class="box b-green"><p class="label-text">નિકાલ</p><p class="number-text">{nikal_rti}</p></div>', unsafe_allow_html=True)
 
-with r2_c2:
-    st.markdown(f'''
-        <div class="box b-deeppurple">
-            <p class="label-text">બીજી અપીલ</p>
-            <p class="number-text">{second_done}</p>
-        </div>
-    ''', unsafe_allow_html=True)
-    if st.button("🔍 જુઓ", key="clk_sdone", use_container_width=True):
-        st.session_state['selected_filter'] = "SecondDone"
-        st.rerun()
+st.markdown("<br>", unsafe_allow_html=True)
 
-with r2_c3:
-    st.markdown(f'''
-        <div class="box b-green">
-            <p class="label-text">નિકાલ</p>
-            <p class="number-text">{nikal_rti}</p>
-        </div>
-    ''', unsafe_allow_html=True)
-    if st.button("🔍 જુઓ", key="clk_nikal", use_container_width=True):
-        st.session_state['selected_filter'] = "Nikal"
-        st.rerun()
+# --- ફિલ્ટરિંગ માટે સુંદર ડ્રોપડાઉન (જેનાથી તમે ગમે તે સ્ટેટસની અરજીઓ તરત જોઈ શકો) ---
+filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"])
+
+if not user_df.empty:
+    if search_term:
+        filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+    else:
+        if filter_option == "પેન્ડિંગ અરજીઓ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
+        elif filter_option == "પ્રથમ અપીલ બાકી":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
+        elif filter_option == "પ્રથમ અપીલ પેન્ડિંગ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]
+        elif filter_option == "બીજી અપીલ બાકી":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
+        elif filter_option == "બીજી અપીલ પેન્ડિંગ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
+        elif filter_option == "નિકાલ થયેલ":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
+        else:
+            filtered_df = user_df
+else:
+    filtered_df = pd.DataFrame()
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -558,7 +488,7 @@ def render_professional_table(df_subset, tab_key):
                 st.rerun()
 
 st.markdown("---")
-st.subheader(f"તમારી અરજીઓનું લિસ્ટ (વ્યુ: {st.session_state['selected_filter']})")
+st.subheader("તમારી અરજીઓનું લિસ્ટ")
 render_professional_table(filtered_df, "main_list")
 
 st.markdown("<br>", unsafe_allow_html=True)
