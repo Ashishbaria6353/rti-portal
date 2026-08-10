@@ -4,22 +4,27 @@ from datetime import date
 import os
 import base64
 import gspread
-from google.oauth2.service_account import Credentials
 
-# પાનાની સેટિંગ્સ
-st.set_page_config(page_title="RTI Manage Portal", layout="wide")
-
-# --- ગૂગલ શીટ કનેક્શન (Streamlit Secrets દ્વારા) ---
+# --- સ્માર્ટ ગૂગલ શીટ કનેક્શન ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+
+try:
+    # ઓનલાઈન ક્લાઉડ માટે (Secrets નો ઉપયોગ)
+    from google.oauth2.service_account import Credentials
+    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
+except:
+    # કમ્પ્યુટર લોકલ માટે (credentials.json નો ઉપયોગ)
+    from oauth2client.service_account import ServiceAccountCredentials
+    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
 
-# --- CSS ડિઝાઇન ---
+# --- પેજ સેટઅપ અને CSS ---
+st.set_page_config(page_title="RTI Manage Portal", layout="wide")
 st.markdown("""
 <style>
-.block-container { background-color: #f8f9fa; padding: 20px; border-radius: 10px; }
-.box { padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); }
+.box { padding: 15px; border-radius: 10px; color: white; text-align: center; box-shadow: 2px 2px 10px rgba(0,0,0,0.1); margin-bottom:10px; }
 .b-blue { background: #1976d2; }
 .b-orange { background: #f57c00; }
 .b-brown { background: #4e342e; }
@@ -49,11 +54,11 @@ def save_data_to_sheet(df):
     sheet.update([df.columns.values.tolist()] + df.values.tolist())
 
 df = load_data()
-user_df = df[df['User_Mobile'] == st.session_state['user_mobile']]
+user_df = df[df['User_Mobile'] == st.session_state['user_mobile']] if not df.empty else pd.DataFrame()
 
-# --- મુખ્ય ડેશબોર્ડ ---
+# --- ડેશબોર્ડ ---
 st.title(f"સ્વાગત છે, {st.session_state['user_name']}")
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 col1.markdown(f'<div class="box b-blue">કુલ RTI<br><b>{len(user_df)}</b></div>', unsafe_allow_html=True)
 col2.markdown(f'<div class="box b-orange">પેન્ડિંગ<br><b>{len(user_df[user_df["સ્ટેટસ"]!="નિકાલ"])}</b></div>', unsafe_allow_html=True)
 col3.markdown(f'<div class="box b-brown">નિકાલ<br><b>{len(user_df[user_df["સ્ટેટસ"]=="નિકાલ"])}</b></div>', unsafe_allow_html=True)
@@ -66,16 +71,19 @@ with tab1:
         pio_name = st.text_input("PIO કચેરી")
         pio_mob = st.text_input("મોબાઈલ નંબર")
         if st.form_submit_button("સેવ કરો"):
-            new_row = {"ID": str(len(df)+1), "User_Mobile": st.session_state['user_mobile'], "સ્ટેટસ": "પેન્ડિંગ", "PIO_કચેરી": pio_name, "PIO_મોબાઈલ": pio_mob}
+            new_id = str(int(df['ID'].max()) + 1) if not df.empty and 'ID' in df.columns else "1"
+            new_row = {"ID": new_id, "User_Mobile": st.session_state['user_mobile'], "સ્ટેટસ": "પેન્ડિંગ", "PIO_કચેરી": pio_name, "PIO_મોબાઈલ": pio_mob}
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             save_data_to_sheet(df)
             st.success("સેવ થઈ ગયું!")
 
 with tab2:
-    st.table(user_df[['ID', 'PIO_કચેરી', 'સ્ટેટસ']])
+    if not user_df.empty:
+        st.table(user_df[['ID', 'PIO_કચેરી', 'સ્ટેટસ']])
+    else:
+        st.info("કોઈ ડેટા નથી.")
 
 with tab3:
-    st.write("અહીંથી તમે ડેટા ડિલીટ કે અપડેટ કરી શકો છો.")
     del_id = st.text_input("ડિલીટ કરવા માટે ID નાખો")
     if st.button("ડિલીટ કરો"):
         df = df[df['ID'] != del_id]
