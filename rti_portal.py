@@ -5,27 +5,61 @@ import os
 
 st.set_page_config(page_title="RTI Manage Portal", layout="wide")
 
-# --- લૉગિન સિસ્ટમ ---
+# --- Streamlit ના ડિફોલ્ટ વોટરમાર્ક/મેનૂ છુપાવવા માટેની CSS ---
+st.markdown("""
+<style>
+#MainMenu {visibility: hidden;}
+footer {visibility: hidden;}
+header {visibility: hidden;}
+.block-container { background-color: #f8f9fa; border: 2px solid #cfd8dc; border-radius: 12px; padding: 1.5rem 1rem !important; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-top: 1rem; }
+button[kind="primary"] { background: linear-gradient(to right, #e53935, #ef5350) !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; border: none !important; }
+div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to right, #1976d2, #42a5f5) !important; }
+.box { padding: 12px; border-radius: 8px; text-align: center; color: white; font-family: sans-serif; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin-bottom: 8px; }
+.blue-box { background: linear-gradient(to right, #3b5998, #4c70ba); }
+.green-box { background: linear-gradient(to right, #4CAF50, #66bb6a); }
+.red-box { background: linear-gradient(to right, #f44336, #ef5350); }
+.orange-box { background: linear-gradient(to right, #ff9800, #ffb74d); }
+.purple-box { background: linear-gradient(to right, #9c27b0, #ba68c8); }
+.number-text { font-size: 28px; font-weight: bold; margin: 0; }
+.mobile-card { background: white; padding: 15px; border-radius: 8px; border: 1px solid #b0bec5; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+</style>
+""", unsafe_allow_html=True)
+
+# --- પરમેનન્ટ લૉગિન સિસ્ટમ (રિફ્રેશ કરવાથી લૉગિન જતું ન રહે તે માટે) ---
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
+if 'user_name' not in st.session_state:
+    st.session_state['user_name'] = ""
+if 'user_mobile' not in st.session_state:
+    st.session_state['user_mobile'] = ""
 if 'manage_action_id' not in st.session_state:
     st.session_state['manage_action_id'] = None
 
+# કુકી દ્વારા લૉગિન સેવ રાખવા માટે query params નો ઉપયોગ
+params = st.query_params
+if "mobile" in params and not st.session_state['logged_in']:
+    st.session_state['logged_in'] = True
+    st.session_state['user_mobile'] = params["mobile"]
+    if "name" in params:
+        st.session_state['user_name'] = params["name"]
+
 if not st.session_state['logged_in']:
-    st.markdown("<h2 style='text-align: center; color: #1e3a8a; margin-top: 50px;'>RTI MANAGE PORTAL માં આપનું સ્વાગત છે</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #1e3a8a; margin-top: 50px;'>RTI MANAGE PORTAL</h2>", unsafe_allow_html=True)
     st.markdown("<p style='text-align: center; color: gray;'>કૃપા કરીને આગળ વધવા માટે લૉગિન કરો</p>", unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         with st.form("login_form"):
-            user_name = st.text_input("તમારું પૂરું નામ")
-            user_mobile = st.text_input("તમારો મોબાઈલ નંબર")
+            u_name = st.text_input("તમારું પૂરું નામ")
+            u_mob = st.text_input("તમારો મોબાઈલ નંબર")
             submitted = st.form_submit_button("લૉગિન કરો (Login)", type="primary")
             if submitted:
-                if user_name != "" and user_mobile != "":
+                if u_name != "" and u_mob != "":
                     st.session_state['logged_in'] = True
-                    st.session_state['user_name'] = user_name
-                    st.session_state['user_mobile'] = str(user_mobile)
+                    st.session_state['user_name'] = u_name
+                    st.session_state['user_mobile'] = str(u_mob)
+                    st.query_params["mobile"] = str(u_mob)
+                    st.query_params["name"] = u_name
                     st.rerun()
                 else:
                     st.error("નામ અને મોબાઈલ નંબર બંને દાખલ કરવા જરૂરી છે!")
@@ -38,6 +72,7 @@ with st.sidebar:
     st.markdown("---")
     if st.button("લૉગઆઉટ કરો (Logout)", type="primary", use_container_width=True):
         st.session_state.clear()
+        st.query_params.clear()
         st.rerun()
 
 DATA_FILE = "rti_data_v5.csv"
@@ -58,7 +93,6 @@ def save_uploaded_file(uploaded_file):
 def load_data():
     if os.path.exists(DATA_FILE):
         df = pd.read_csv(DATA_FILE, dtype=str)
-        # જો કૉલમનું નામ અલગ હોય તો તેને 'સ્ટેટસ' કરી દેવું
         for col in df.columns:
             if 'સ્ટેટ' in col or 'status' in col.lower():
                 df.rename(columns={col: 'સ્ટેટસ'}, inplace=True)
@@ -104,38 +138,18 @@ if not user_df.empty:
         df.to_csv(DATA_FILE, index=False)
         user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy()
 
-# --- CSS ડિઝાઇન ---
-st.markdown("""
-<style>
-.block-container { background-color: #f8f9fa; border: 2px solid #cfd8dc; border-radius: 12px; padding: 2rem 3rem !important; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-top: 2rem; }
-button[kind="primary"] { background: linear-gradient(to right, #e53935, #ef5350) !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; border: none !important; }
-div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to right, #1976d2, #42a5f5) !important; }
-.box { padding: 15px; border-radius: 8px; text-align: center; color: white; font-family: sans-serif; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); }
-.blue-box { background: linear-gradient(to right, #3b5998, #4c70ba); }
-.green-box { background: linear-gradient(to right, #4CAF50, #66bb6a); }
-.red-box { background: linear-gradient(to right, #f44336, #ef5350); }
-.orange-box { background: linear-gradient(to right, #ff9800, #ffb74d); }
-.purple-box { background: linear-gradient(to right, #9c27b0, #ba68c8); }
-.number-text { font-size: 35px; font-weight: bold; margin: 0; }
-div[data-testid="column"] { padding: 0px 6px !important; }
-.tbl-hdr { background-color: #7ab8eb; color: white; text-align: center; padding: 10px; font-weight: bold; border-radius: 4px; font-size: 14px; margin-bottom: 5px; }
-.tbl-cell { text-align: center; padding: 10px; font-size: 14px; border-bottom: 1px solid #e1f5fe; height: 100%; display: flex; align-items: center; justify-content: center; }
-</style>
-""", unsafe_allow_html=True)
-
-# --- ટોચ પર ફક્ત "Home" બટન (આઈકન વગર), ટાઇટલ અને સર્ચ ઓપ્શન ---
+# --- ટોચ પર Home બટન, ટાઇટલ અને સર્ચ ઓપ્શન ---
 col_home, col_title, col_search = st.columns([0.8, 1.7, 1.5])
 with col_home:
-    st.markdown("<br>", unsafe_allow_html=True)
     if st.button("Home", use_container_width=True):
         st.session_state['manage_action_id'] = None
         st.rerun()
 with col_title:
-    st.markdown("<h1 style='color: #1e3a8a; font-weight: bold; margin:0;'>RTI MANAGE PORTAL</h1>", unsafe_allow_html=True)
+    st.markdown("<h3 style='color: #1e3a8a; font-weight: bold; margin:0;'>RTI PORTAL</h3>", unsafe_allow_html=True)
 with col_search:
-    search_term = st.text_input("🔍 અરજી શોધો:", placeholder="ID અથવા કચેરીનું નામ...", label_visibility="collapsed")
+    search_term = st.text_input("🔍 શોધો:", placeholder="ID કે કચેરી...", label_visibility="collapsed")
 
-st.markdown("<hr style='border: 1px solid #cfd8dc; margin-top: 10px;'>", unsafe_allow_html=True)
+st.markdown("<hr style='border: 1px solid #cfd8dc; margin: 10px 0;'>", unsafe_allow_html=True)
 
 if search_term:
     filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
@@ -143,15 +157,15 @@ else:
     filtered_df = user_df
 
 c1, c2, c3, c4, c5 = st.columns(5)
-with c1: st.markdown(f'<div class="box blue-box"><h6>કુલ RTI</h6><p class="number-text">{len(user_df)}</p></div>', unsafe_allow_html=True)
-with c2: st.markdown(f'<div class="box orange-box"><h6>પેન્ડિંગ (30 દિવસ)</h6><p class="number-text">{len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"])}</p></div>', unsafe_allow_html=True)
-with c3: st.markdown(f'<div class="box red-box"><h6>પ્રથમ અપીલ</h6><p class="number-text">{len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ"])])}</p></div>', unsafe_allow_html=True)
-with c4: st.markdown(f'<div class="box purple-box"><h6>બીજી અપીલ (આયોગ)</h6><p class="number-text">{len(user_df[user_df["સ્ટેટસ"].isin(["બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])])}</p></div>', unsafe_allow_html=True)
-with c5: st.markdown(f'<div class="box green-box"><h6>નિકાલ થયેલ</h6><p class="number-text">{len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"])}</p></div>', unsafe_allow_html=True)
+with c1: st.markdown(f'<div class="box blue-box"><small>કુલ RTI</small><p class="number-text">{len(user_df)}</p></div>', unsafe_allow_html=True)
+with c2: st.markdown(f'<div class="box orange-box"><small>પેન્ડિંગ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"])}</p></div>', unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="box red-box"><small>પ્રથમ અપીલ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ"])])}</p></div>', unsafe_allow_html=True)
+with c4: st.markdown(f'<div class="box purple-box"><small>બીજી અપીલ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"].isin(["બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])])}</p></div>', unsafe_allow_html=True)
+with c5: st.markdown(f'<div class="box green-box"><small>નિકાલ</small><p class="number-text">{len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"])}</p></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ અને સુધારા (Edit)"])
+tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & ડિલીટ"])
 
 with tab1:
     with st.form("new_rti_form", clear_on_submit=True):
@@ -229,16 +243,16 @@ with tab3:
                 st.rerun()
     else: st.info("કોઈ અરજી બીજી અપીલ માટે બાકી નથી.")
 
-# TAB 4: મેનેજમેન્ટ અને સુધારા (Edit & Download Excel)
+# TAB 4: મેનેજમેન્ટ, એડિટ અને ડિલીટ ઓપ્શન
 with tab4:
     st.subheader("📊 એક્સેલ રિપોર્ટ ડાઉનલોડ કરો")
     csv = filtered_df.to_csv(index=False).encode('utf-8-sig')
     st.download_button(label="📥 તમારો ડેટા એક્સેલમાં ડાઉનલોડ કરો", data=csv, file_name="RTI_Report.csv", mime="text/csv")
     
     st.markdown("---")
-    st.subheader("✏️ અરજીની વિગતો સુધારો (Edit Details)")
+    st.subheader("✏️ અરજીની વિગતો સુધારો અથવા ડિલીટ કરો")
     if not user_df.empty:
-        edit_choice = st.selectbox("સુધારવા માટે અરજી પસંદ કરો:", user_df.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
+        edit_choice = st.selectbox("અરજી પસંદ કરો:", user_df.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1), key="edit_select")
         if edit_choice:
             edit_id = edit_choice.split(" - ")[0].replace("ID: ", "").strip()
             e_row = user_df[user_df['ID'] == edit_id].iloc[0]
@@ -250,11 +264,24 @@ with tab4:
                 with c2:
                     ed_speed = st.text_input("સ્પીડ પોસ્ટ નંબર", value=str(e_row.get('RTI_સ્પીડપોસ્ટ', '')))
                     ed_mob = st.text_input("મોબાઈલ નંબર", value=str(e_row.get('PIO_મોબાઈલ', '')))
-                if st.form_submit_button("✅ વિગતો અપડેટ કરો"):
+                
+                col_sub1, col_sub2 = st.columns(2)
+                with col_sub1:
+                    update_btn = st.form_submit_button("✅ વિગતો અપડેટ કરો")
+                with col_sub2:
+                    delete_btn = st.form_submit_button("❌ આ અરજી ડિલીટ કરો", type="primary")
+                
+                if update_btn:
                     r_idx = df[df['ID'] == edit_id].index[0]
                     df.at[r_idx, 'PIO_કચેરી'], df.at[r_idx, 'PIO_સરનામું'], df.at[r_idx, 'RTI_સ્પીડપોસ્ટ'], df.at[r_idx, 'PIO_મોબાઈલ'] = ed_pio, ed_addr, ed_speed, ed_mob
                     df.to_csv(DATA_FILE, index=False)
                     st.success("માહિતી સફળતાપૂર્વક અપડેટ થઈ ગઈ છે!")
+                    st.rerun()
+                
+                if delete_btn:
+                    df = df[df['ID'] != edit_id]
+                    df.to_csv(DATA_FILE, index=False)
+                    st.success("અરજી સફળતાપૂર્વક ડિલીટ થઈ ગઈ છે!")
                     st.rerun()
 
 # ==========================================
@@ -266,9 +293,9 @@ if st.session_state['manage_action_id']:
     
     if not m_row_data.empty:
         m_row = m_row_data.iloc[0]
-        st.markdown("<div style='background-color: #f1f8ff; padding: 20px; border: 2px solid #7ab8eb; border-radius: 10px; margin: 20px 0;'>", unsafe_allow_html=True)
-        col_t, col_btn = st.columns([4, 1])
-        with col_t: st.markdown(f"<h3 style='color: #1e3a8a; margin:0;'>📂 દસ્તાવેજો (View & Upload): ID - {real_m_id}</h3>", unsafe_allow_html=True)
+        st.markdown("<div style='background-color: #f1f8ff; padding: 15px; border: 2px solid #7ab8eb; border-radius: 10px; margin: 15px 0;'>", unsafe_allow_html=True)
+        col_t, col_btn = st.columns([3, 1])
+        with col_t: st.markdown(f"<h4 style='color: #1e3a8a; margin:0;'>📂 દસ્તાવેજો: ID - {real_m_id}</h4>", unsafe_allow_html=True)
         with col_btn:
             if st.button("❌ બંધ કરો", use_container_width=True):
                 st.session_state['manage_action_id'] = None
@@ -312,48 +339,40 @@ if st.session_state['manage_action_id']:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# ઇન્ટરેક્ટિવ ટેબલ
+# મોબાઈલ અને ડેસ્કટોપ ફ્રેંડલી રિસ્પોન્સિવ લિસ્ટ
 # ==========================================
-def render_interactive_table(df_subset, tab_key):
+def render_responsive_table(df_subset, tab_key):
     if df_subset.empty:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
         return
     
-    c1, c2, c3, c4, c5, c6, c7 = st.columns([0.6, 1.5, 2, 2.5, 1.5, 1.5, 2.0])
-    c1.markdown('<div class="tbl-hdr">Sr.</div>', unsafe_allow_html=True)
-    c2.markdown('<div class="tbl-hdr">ID</div>', unsafe_allow_html=True)
-    c3.markdown('<div class="tbl-hdr">Applicant</div>', unsafe_allow_html=True)
-    c4.markdown('<div class="tbl-hdr">PIO Office</div>', unsafe_allow_html=True)
-    c5.markdown('<div class="tbl-hdr">Date</div>', unsafe_allow_html=True)
-    c6.markdown('<div class="tbl-hdr">Status</div>', unsafe_allow_html=True)
-    c7.markdown('<div class="tbl-hdr">Action</div>', unsafe_allow_html=True)
-
     for i, (index, row) in enumerate(df_subset.iterrows()):
-        c1, c2, c3, c4, c5, c6, c7 = st.columns([0.6, 1.5, 2, 2.5, 1.5, 1.5, 2.0])
         dt = row.get('RTI_તારીખ', '-')
         status = row.get('સ્ટેટસ', '-')
         color = "#d32f2f" if "પેન્ડિંગ" in str(status) or "બાકી" in str(status) else "#2e7d32"
         
-        c1.markdown(f'<div class="tbl-cell">{i+1}</div>', unsafe_allow_html=True)
-        c2.markdown(f'<div class="tbl-cell" style="font-weight:bold;">{row["ID"]}</div>', unsafe_allow_html=True)
-        c3.markdown(f'<div class="tbl-cell">{st.session_state["user_name"]}</div>', unsafe_allow_html=True)
-        c4.markdown(f'<div class="tbl-cell">{row.get("PIO_કચેરી", "-")}</div>', unsafe_allow_html=True)
-        c5.markdown(f'<div class="tbl-cell">{dt}</div>', unsafe_allow_html=True)
-        c6.markdown(f'<div class="tbl-cell" style="font-weight: bold; color: {color};">{status}</div>', unsafe_allow_html=True)
+        # મોબાઈલ માટે કાર્ડ ડિઝાઈન અને ડેસ્કટોપ માટે પ્રોપર લિસ્ટ
+        st.markdown(f"""
+        <div class="mobile-card">
+            <b>ક્રમ:</b> {i+1} | <b>ID:</b> {row['ID']}<br>
+            <b>કચેરી:</b> {row.get('PIO_કચેરી', '-')}<br>
+            <b>તારીખ:</b> {dt}<br>
+            <b>સ્ટેટસ:</b> <span style="color: {color}; font-weight: bold;">{status}</span>
+        </div>
+        """, unsafe_allow_html=True)
         
-        with c7:
-            st.markdown('<div style="margin-top: 5px;"></div>', unsafe_allow_html=True)
-            if st.button("👁️ જુઓ / 📤 અપલોડ", key=f"btn_{row['ID']}_{tab_key}"):
-                st.session_state['manage_action_id'] = row['ID']
-                st.rerun()
+        if st.button("👁️ જુઓ / 📤 અપલોડ", key=f"btn_{row['ID']}_{tab_key}", use_container_width=True):
+            st.session_state['manage_action_id'] = row['ID']
+            st.rerun()
+        st.markdown("<hr style='margin: 5px 0;'>", unsafe_allow_html=True)
 
 st.markdown("---")
 st.subheader("તમારી અરજીઓનું લિસ્ટ અને નિકાલ")
 list_tab1, list_tab2, list_tab3 = st.tabs(["આખી યાદી (All)", "પ્રથમ અપીલમાં ગયેલી", "બીજી અપીલમાં (આયોગમાં) ગયેલી"])
 
-with list_tab1: render_interactive_table(filtered_df, "all")
-with list_tab2: render_interactive_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])], "first")
-with list_tab3: render_interactive_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])], "second")
+with list_tab1: render_responsive_table(filtered_df, "all")
+with list_tab2: render_responsive_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])], "first")
+with list_tab3: render_responsive_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])], "second")
 
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("#### ✅ અરજીનો નિકાલ (જવાબ આવી ગયો હોય તો)")
