@@ -3,8 +3,16 @@ import pandas as pd
 from datetime import date
 import os
 import base64
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="RTI Manage Portal", layout="wide")
+
+# --- ગૂગલ શીટ કનેક્શન સેટઅપ ---
+scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+client = gspread.authorize(creds)
+sheet = client.open("RTI_Database").sheet1
 
 # --- શાનદાર કલર અને ડિઝાઇન માટેની CSS ---
 st.markdown("""
@@ -16,15 +24,14 @@ header {visibility: hidden;}
 button[kind="primary"] { background: linear-gradient(to right, #e53935, #ef5350) !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; border: none !important; }
 div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to right, #1976d2, #42a5f5) !important; }
 
-/* ૭ બોક્સ માટેના આકર્ષક અને યુનિક કલર્સ */
 .box { padding: 14px 10px; border-radius: 10px; text-align: center; color: white; font-family: sans-serif; box-shadow: 0px 4px 8px rgba(0,0,0,0.15); margin-bottom: 12px; }
-.b-blue { background: linear-gradient(to right, #1976d2, #42a5f5); }          /* કુલ RTI */
-.b-orange { background: linear-gradient(to right, #f57c00, #ffa726); }       /* પેન્ડિંગ */
-.b-brown { background: linear-gradient(to right, #4e342e, #6d4c41); }        /* પ્રથમ અપીલ બાકી */
-.b-red { background: linear-gradient(to right, #d32f2f, #ef5350); }          /* પ્રથમ અપીલ */
-.b-purple { background: linear-gradient(to right, #7b1fa2, #ab47bc); }       /* બીજી અપીલ બાકી */
-.b-deeppurple { background: linear-gradient(to right, #311b92, #5e35b1); }   /* બીજી અપીલ */
-.b-green { background: linear-gradient(to right, #388e3c, #66bb6a); }         /* નિકાલ */
+.b-blue { background: linear-gradient(to right, #1976d2, #42a5f5); }          
+.b-orange { background: linear-gradient(to right, #f57c00, #ffa726); }       
+.b-brown { background: linear-gradient(to right, #4e342e, #6d4c41); }        
+.b-red { background: linear-gradient(to right, #d32f2f, #ef5350); }          
+.b-purple { background: linear-gradient(to right, #7b1fa2, #ab47bc); }       
+.b-deeppurple { background: linear-gradient(to right, #311b92, #5e35b1); }   
+.b-green { background: linear-gradient(to right, #388e3c, #66bb6a); }         
 
 .number-text { font-size: 26px; font-weight: bold; margin: 4px 0 0 0; }
 .label-text { font-size: 14px; font-weight: 600; margin: 0; }
@@ -74,9 +81,9 @@ if not st.session_state['logged_in']:
                     st.error("નામ અને મોબાઈલ નંબર બંને દાખલ કરવા જરૂરી છે!")
     st.stop()
 
-# --- સાઈડબાર (પ્રોફાઈલ અને લૉગઆઉટ બટન) ---
+# --- સાઈડબાર ---
 with st.sidebar:
-    st.markdown("### 👤 તમારું પ્રોફાઈલ")
+    st.markdown("### 👤 તમારું પ્રોફાઈल")
     st.info(f"**નામ:** {st.session_state['user_name']}\n\n**મોબાઈલ:** {st.session_state['user_mobile']}")
     st.markdown("---")
     if st.button("લૉગઆઉટ કરો (Logout)", type="primary", use_container_width=True):
@@ -84,10 +91,8 @@ with st.sidebar:
         st.query_params.clear()
         st.rerun()
 
-DATA_FILE = "rti_data_v6.csv"
 EXTRA_DOCS_FILE = "rti_extra_docs_v6.csv"
 UPLOAD_FOLDER = "uploads"
-
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
@@ -99,23 +104,33 @@ def save_uploaded_file(uploaded_file):
         return file_path
     return "ફાઈલ નથી"
 
+# --- ગૂગલ શીટમાંથી ડેટા લોડ કરવો ---
 def load_data():
-    cols = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
-            'FAA_તારીખ', 'FAA_સુનાવણી_તારીખ', 'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
-            'SA_તારીખ', 'SA_સુનાવણી_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
-    if os.path.exists(DATA_FILE):
-        try:
-            df = pd.read_csv(DATA_FILE, dtype=str)
-            if df.empty or 'RTI_તારીખ' not in df.columns:
-                return pd.DataFrame(columns=cols)
-            for col in cols:
-                if col not in df.columns:
-                    df[col] = ""
-            return df
-        except Exception:
+    try:
+        data = sheet.get_all_records()
+        df = pd.DataFrame(data)
+        cols = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
+                'FAA_તારીખ', 'FAA_સુનાવણી_તારીખ', 'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
+                'SA_તારીખ', 'SA_સુનાવણી_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
+        if df.empty:
             return pd.DataFrame(columns=cols)
-    else:
+        for col in cols:
+            if col not in df.columns:
+                df[col] = ""
+        return df.astype(str)
+    except Exception as e:
+        cols = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
+                'FAA_તારીખ', 'FAA_સુનાવણી_તારીખ', 'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
+                'SA_તારીખ', 'SA_સુનાવણી_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈಲ್']
         return pd.DataFrame(columns=cols)
+
+# --- ગૂગલ શીટમાં ડેટા સેવ કરવો ---
+def save_data_to_sheet(df):
+    try:
+        sheet.clear()
+        sheet.update([df.columns.values.tolist()] + df.values.tolist())
+    except Exception as e:
+        st.error(f"ગૂગલ શીટ સેવ કરતી વખતે એરર આવી: {e}")
 
 def load_extra_docs():
     if os.path.exists(EXTRA_DOCS_FILE):
@@ -171,7 +186,7 @@ if not user_df.empty:
                         changed = True
                         
     if changed:
-        df.to_csv(DATA_FILE, index=False)
+        save_data_to_sheet(df)
         user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy()
 
 # --- ટોચ પર Home બટન, સેન્ટર હેડિંગ અને સર્ચ બોક્સ ---
@@ -196,14 +211,13 @@ second_due = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપ�
 second_done = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 
-# --- ઉપર 4 કલરફુલ બોક્સ ---
+# --- કલરફુલ બોક્સ ---
 r1_c1, r1_c2, r1_c3, r1_c4 = st.columns(4)
 with r1_c1: st.markdown(f'<div class="box b-blue"><p class="label-text">કુલ RTI</p><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
 with r1_c2: st.markdown(f'<div class="box b-orange"><p class="label-text">પેન્ડિંગ</p><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
 with r1_c3: st.markdown(f'<div class="box b-brown"><p class="label-text">પ્રથમ અપીલ બાકી</p><p class="number-text">{first_due}</p></div>', unsafe_allow_html=True)
 with r1_c4: st.markdown(f'<div class="box b-red"><p class="label-text">પ્રથમ અપીલ</p><p class="number-text">{first_done}</p></div>', unsafe_allow_html=True)
 
-# --- નીચે 3 કલરફુલ બોક્સ ---
 r2_c1, r2_c2, r2_c3 = st.columns(3)
 with r2_c1: st.markdown(f'<div class="box b-purple"><p class="label-text">બીજી અપીલ બાકી</p><p class="number-text">{second_due}</p></div>', unsafe_allow_html=True)
 with r2_c2: st.markdown(f'<div class="box b-deeppurple"><p class="label-text">બીજી અપીલ</p><p class="number-text">{second_done}</p></div>', unsafe_allow_html=True)
@@ -238,14 +252,15 @@ with tab1:
                 else:
                     new_id = "1"
             
-            new_row = {"ID": new_id, "User_Mobile": st.session_state['user_mobile'], "સ્ટેટસ": "પેન્ડિંગ", "RTI_તારીખ": str(rti_date), "PIO_કચેરી": pio_name, "PIO_સરનામું": pio_address, 
-                       "PIO_પિનકોડ": pio_pin, "PIO_મોબાઈલ": pio_mob, "RTI_સ્પીડપોસ્ટ": rti_speed, "RTI_ફાઈલ": save_uploaded_file(rti_file)}
+            new_row = {"ID": new_id, "User_Mobile": str(st.session_state['user_mobile']), "સ્ટેટસ": "પેન્ડિંગ", "RTI_તારીખ": str(rti_date), "PIO_કચેરી": pio_name, "PIO_સરનામું": pio_address, 
+                       "PIO_પિનકોડ": pio_pin, "PIO_મોબાઈલ": pio_mob, "RTI_સ્પીડપોસ્ટ": rti_speed, "RTI_ફાઈલ": save_uploaded_file(rti_file),
+                       "FAA_તારીખ": "", "FAA_સુનાવણી_તારીખ": "", "FAA_અધિકારી": "", "FAA_સરનામું": "", "FAA_પિનકોડ": "", "FAA_મોબાઈલ": "", "FAA_સ્પીડપોસ્ટ": "", "FAA_ફાઈલ": "",
+                       "SA_તારીખ": "", "SA_સુનાવણી_તારીખ": "", "SA_સ્પીડપોસ્ટ": "", "SA_ફાઈલ": ""}
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            df.to_csv(DATA_FILE, index=False)
-            st.success(f"નવી RTI સફળતાપૂર્વક દાખલ થઈ ગઈ છે! ID: {new_id}")
+            save_data_to_sheet(df)
+            st.success(f"નવી RTI સફળતાપૂર્વક ગૂગલ શીટમાં સેવ થઈ ગઈ છે! ID: {new_id}")
             st.rerun()
 
-    # --- ડ્રોપડાઉન ફિલ્ટર બરાબર SAVE RTI ની નીચે અને લિસ્ટની ઉપર ---
     st.markdown("---")
     filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ (All)", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"], key="table_filter_box")
 
@@ -307,8 +322,8 @@ with tab2:
                 if faa_file is not None:
                     df.at[r_idx, 'FAA_ફાઈલ'] = save_uploaded_file(faa_file)
                 df.at[r_idx, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
-                df.to_csv(DATA_FILE, index=False)
-                st.success("પ્રથમ અપીલ સફળતાપૂર્વક સેવ થઈ ગઈ છે!")
+                save_data_to_sheet(df)
+                st.success("પ્રથમ અપીલ સફળતાપૂર્વક ગૂગલ શીટમાં સેવ થઈ ગઈ છે!")
                 st.rerun()
     else: 
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
@@ -343,8 +358,8 @@ with tab3:
                 if sa_file is not None:
                     df.at[r_idx, 'SA_ફાઈલ'] = save_uploaded_file(sa_file)
                 df.at[r_idx, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
-                df.to_csv(DATA_FILE, index=False)
-                st.success("બીજી અપીલ સફળતાપૂર્વક સેવ થઈ ગઈ છે!")
+                save_data_to_sheet(df)
+                st.success("બીજી અપીલ સફળતાપૂર્વક ગૂગલ શીટમાં સેવ થઈ ગઈ છે!")
                 st.rerun()
     else: 
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
@@ -383,13 +398,13 @@ with tab4:
                     df.at[r_idx, 'PIO_સરનામું'] = str(ed_addr)
                     df.at[r_idx, 'RTI_સ્પીડપોસ્ટ'] = str(ed_speed)
                     df.at[r_idx, 'PIO_મોબાઈલ'] = str(ed_mob)
-                    df.to_csv(DATA_FILE, index=False)
+                    save_data_to_sheet(df)
                     st.success("માહિતી સફળતાપૂર્વક અપડેટ થઈ ગઈ છે!")
                     st.rerun()
                 
                 if delete_btn:
                     df = df[df['ID'] != edit_id]
-                    df.to_csv(DATA_FILE, index=False)
+                    save_data_to_sheet(df)
                     st.success("અરજી સફળતાપૂર્વક ડિલીટ થઈ ગઈ છે!")
                     st.rerun()
 
@@ -498,6 +513,6 @@ if not dispose_rtis.empty:
     if st.button("આ અરજીનો નિકાલ કરો (Dispose)", type="primary"):
         r_idx = df[df['ID'] == dispose_id_str.split(" - ")[0].replace("ID: ", "").strip()].index[0]
         df.at[r_idx, 'સ્ટેટસ'] = 'નિકાલ'
-        df.to_csv(DATA_FILE, index=False)
+        save_data_to_sheet(df)
         st.success("અરજીનો સફળતાપૂર્વક નિકાલ થઈ ગઈ છે!")
         st.rerun()
