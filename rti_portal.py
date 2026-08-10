@@ -43,6 +43,8 @@ if 'user_mobile' not in st.session_state:
     st.session_state['user_mobile'] = ""
 if 'manage_action_id' not in st.session_state:
     st.session_state['manage_action_id'] = None
+if 'selected_filter' not in st.session_state:
+    st.session_state['selected_filter'] = "All"
 
 params = st.query_params
 if "mobile" in params and not st.session_state['logged_in']:
@@ -74,7 +76,7 @@ if not st.session_state['logged_in']:
                     st.error("નામ અને મોબાઈલ નંબર બંને દાખલ કરવા જરૂરી છે!")
     st.stop()
 
-# --- સાઈડબાર (Profile & Logout) ---
+# --- સાઈડબાર (Profile & Logout - સંપૂર્ણ સુધારેલ) ---
 with st.sidebar:
     st.markdown("### 👤 તમારું પ્રોફાઈલ")
     st.info(f"**નામ:** {st.session_state['user_name']}\n\n**મોબાઈલ:** {st.session_state['user_mobile']}")
@@ -174,25 +176,46 @@ if not user_df.empty:
         df.to_csv(DATA_FILE, index=False)
         user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy()
 
-# --- ટોચ પર Home બટન, મુખ્ય હેડિંગ અને સર્ચ ઓપ્શન ---
-col_home, col_title, col_search = st.columns([0.8, 1.7, 1.5])
+# --- ટોચ પર Home બટન, સેન્ટર હેડિંગ અને પ્રોફેશનલ સર્ચ બોક્સ ---
+col_home, col_title, col_search = st.columns([1, 2, 1.5])
 with col_home:
-    if st.button("Home", use_container_width=True):
+    if st.button("🏠 Home", use_container_width=True):
         st.session_state['manage_action_id'] = None
+        st.session_state['selected_filter'] = "All"
         st.rerun()
 with col_title:
-    st.markdown("<h3 style='color: #1e3a8a; font-weight: bold; margin:0;'>RTI MANAGE PORTAL</h3>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #1e3a8a; font-weight: bold; margin:0;'>RTI MANAGE PORTAL</h2>", unsafe_allow_html=True)
 with col_search:
-    search_term = st.text_input("🔍 શોધો:", placeholder="ID કે કચેરી...", label_visibility="collapsed")
+    search_term = st.text_input("🔍 સર્ચ કરો:", placeholder="ID, કચેરી કે મોબાઈલ નંબર નાખો...", label_visibility="collapsed")
 
 st.markdown("<hr style='border: 1px solid #cfd8dc; margin: 10px 0;'>", unsafe_allow_html=True)
 
-if not user_df.empty and search_term:
-    filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+# --- ફિલ્ટરિંગ લૉજિક (સર્ચ અને કલર બોક્સ ક્લિક માટે) ---
+if not user_df.empty:
+    if search_term:
+        filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+    else:
+        f_val = st.session_state['selected_filter']
+        if f_val == "All":
+            filtered_df = user_df
+        elif f_val == "Pending":
+            filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
+        elif f_val == "FirstDue":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]
+        elif f_val == "FirstDone":
+            filtered_df = user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]
+        elif f_val == "SecondDue":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]
+        elif f_val == "SecondDone":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]
+        elif f_val == "Nikal":
+            filtered_df = user_df[user_df["સ્ટેટસ"] == "નિકાલ"]
+        else:
+            filtered_df = user_df
 else:
-    filtered_df = user_df
+    filtered_df = pd.DataFrame()
 
-# --- કાઉન્ટર ડેટા મેળવો (જ્યાં સુધી નિકાલ ન થાય ત્યાં સુધી પેન્ડિંગ બોક્સમાં ગણતરી ચાલુ રહેશે) ---
+# --- કાઉન્ટર ડેટા મેળવો ---
 total_rti = len(user_df) if not user_df.empty else 0
 pending_rti = len(user_df[user_df["સ્ટેટસ"] != "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 first_due = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
@@ -201,18 +224,39 @@ second_due = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપ�
 second_done = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 
-# --- ઉપર 4 બોક્સ ---
+# --- ઉપર 4 ક્લિકેબલ બોક્સ ---
 r1_c1, r1_c2, r1_c3, r1_c4 = st.columns(4)
-with r1_c1: st.markdown(f'<div class="box b-blue"><p class="label-text">કુલ RTI</p><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
-with r1_c2: st.markdown(f'<div class="box b-orange"><p class="label-text">પેન્ડિંગ</p><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
-with r1_c3: st.markdown(f'<div class="box b-brown"><p class="label-text">પ્રથમ અપીલ બાકી</p><p class="number-text">{first_due}</p></div>', unsafe_allow_html=True)
-with r1_c4: st.markdown(f'<div class="box b-red"><p class="label-text">પ્રથમ અપીલ</p><p class="number-text">{first_done}</p></div>', unsafe_allow_html=True)
+with r1_c1:
+    if st.button(f"📊 કુલ RTI\n\n {total_rti}", use_container_width=True, key="btn_box_all"):
+        st.session_state['selected_filter'] = "All"
+        st.rerun()
+with r1_c2:
+    if st.button(f"⏳ પેન્ડિંગ\n\n {pending_rti}", use_container_width=True, key="btn_box_pending"):
+        st.session_state['selected_filter'] = "Pending"
+        st.rerun()
+with r1_c3:
+    if st.button(f"⚠️ પ્રથમ અપીલ બાકી\n\n {first_due}", use_container_width=True, key="btn_box_fdue"):
+        st.session_state['selected_filter'] = "FirstDue"
+        st.rerun()
+with r1_c4:
+    if st.button(f"⚖️ પ્રથમ અપીલ\n\n {first_done}", use_container_width=True, key="btn_box_fdone"):
+        st.session_state['selected_filter'] = "FirstDone"
+        st.rerun()
 
-# --- નીચે 3 બોક્સ ---
+# --- નીચે 3 ક્લિકેબલ બોક્સ ---
 r2_c1, r2_c2, r2_c3 = st.columns(3)
-with r2_c1: st.markdown(f'<div class="box b-purple"><p class="label-text">બીજી અપીલ બાકી</p><p class="number-text">{second_due}</p></div>', unsafe_allow_html=True)
-with r2_c2: st.markdown(f'<div class="box b-deeppurple"><p class="label-text">બીજી અપીલ</p><p class="number-text">{second_done}</p></div>', unsafe_allow_html=True)
-with r2_c3: st.markdown(f'<div class="box b-green"><p class="label-text">નિકાલ</p><p class="number-text">{nikal_rti}</p></div>', unsafe_allow_html=True)
+with r2_c1:
+    if st.button(f"⚠️ બીજી અપીલ બાકી\n\n {second_due}", use_container_width=True, key="btn_box_sdue"):
+        st.session_state['selected_filter'] = "SecondDue"
+        st.rerun()
+with r2_c2:
+    if st.button(f"🏛️ બીજી અપીલ\n\n {second_done}", use_container_width=True, key="btn_box_sdone"):
+        st.session_state['selected_filter'] = "SecondDone"
+        st.rerun()
+with r2_c3:
+    if st.button(f"✅ નિકાલ\n\n {nikal_rti}", use_container_width=True, key="btn_box_nikal"):
+        st.session_state['selected_filter'] = "Nikal"
+        st.rerun()
 
 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -247,7 +291,7 @@ with tab1:
                        "PIO_પિનકોડ": pio_pin, "PIO_મોબાઈલ": pio_mob, "RTI_સ્પીડપોસ્ટ": rti_speed, "RTI_ફાઈલ": save_uploaded_file(rti_file)}
             df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
             df.to_csv(DATA_FILE, index=False)
-            st.success(f"નવી RTI સફળતાપૂર્વક દાખલ થઈ ગઈ છે! નવા ID: {new_id}")
+            st.success(f"નવી RTI સફળતાપૂર્વક દાખલ થઈ ગઈ છે! ID: {new_id}")
             st.rerun()
 
 with tab2:
@@ -467,12 +511,8 @@ def render_professional_table(df_subset, tab_key):
                 st.rerun()
 
 st.markdown("---")
-st.subheader("તમારી અરજીઓનું લિસ્ટ અને નિકાલ")
-list_tab1, list_tab2, list_tab3 = st.tabs(["આખી યાદી (All)", "પેન્ડિંગ અરજીઓ", "નિકાલ થયેલ"])
-
-with list_tab1: render_professional_table(filtered_df, "all")
-with list_tab2: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'] != 'નિકાલ'] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "pending")
-with list_tab3: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'] == 'નિકાલ'] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "nikal")
+st.subheader(f"તમારી અરજીઓનું લિસ્ટ (ફિલ્ટર: {st.session_state['selected_filter']})")
+render_professional_table(filtered_df, "main_list")
 
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("#### ✅ અરજીનો નિકાલ (જવાબ આવી ગયો હોય તો)")
