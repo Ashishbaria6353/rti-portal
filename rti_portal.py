@@ -132,7 +132,7 @@ extra_docs_df = load_extra_docs()
 if not user_df.empty and 'સ્ટેટસ' not in user_df.columns:
     user_df['સ્ટેટસ'] = 'પેન્ડિંગ'
 
-# --- ઓટોમેટિક લોજિક ---
+# --- સુધારેલું અને પાવરફુલ ઓટોમેટિક ટાઈમ લૉજિક ---
 if not user_df.empty:
     today = date.today()
     changed = False
@@ -140,16 +140,41 @@ if not user_df.empty:
         real_index = df[df['ID'] == row['ID']].index[0]
         status_val = str(row.get('સ્ટેટસ', 'પેન્ડિંગ'))
         
-        if status_val == 'પેન્ડિંગ' and pd.notna(row.get('RTI_તારીખ')):
-            if (today - row['RTI_તારીખ']).days > 30 and not str(row.get('FAA_તારીખ', '')):
-                df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ બાકી'
-                changed = True
-                
-        elif status_val == 'પ્રથમ અપીલ પેન્ડિંગ' and pd.notna(row.get('FAA_તારીખ')):
-            if (today - row['FAA_તારીખ']).days > 45 and not str(row.get('SA_તારીખ', '')):
-                df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ બાકી'
-                changed = True
-                
+        rti_dt = row.get('RTI_તારીખ')
+        faa_dt = row.get('FAA_તારીખ')
+        sa_dt = row.get('SA_તારીખ')
+        
+        # જો નિકાલ ન થયો હોય તો જ સમય ગણવો
+        if status_val != 'નિકાલ':
+            # ૧. જો બીજી અપીલની તારીખ ભરેલી હોય તો સ્ટેટસ 'બીજી અપીલ પેન્ડિંગ'
+            if pd.notna(sa_dt) and str(sa_dt) != "" and str(sa_dt) != "NaT":
+                if status_val != 'બીજી અપીલ પેન્ડિંગ':
+                    df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
+                    changed = True
+            
+            # ૨. જો પ્રથમ અપીલની તારીખ ભરેલી હોય
+            elif pd.notna(faa_dt) and str(faa_dt) != "" and str(faa_dt) != "NaT":
+                # અપીલ તારીખથી ૪૫ દિવસ વીતી ગયા હોય અને બીજી અપીલ ન કરી હોય તો 'બીજી અપીલ બાકી'
+                if (today - faa_dt).days > 45:
+                    if status_val != 'બીજી અપીલ બાકી':
+                        df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ બાકી'
+                        changed = True
+                else:
+                    if status_val != 'પ્રથમ અપીલ પેન્ડિંગ':
+                        df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
+                        changed = True
+            
+            # ૩. જો હજી પ્રથમ અપીલ ન કરી હોય પણ RTI તારીખથી ૩૦ દિવસ વીતી ગયા હોય
+            elif pd.notna(rti_dt) and str(rti_dt) != "" and str(rti_dt) != "NaT":
+                if (today - rti_dt).days > 30:
+                    if status_val != 'પ્રથમ અપીલ બાકી':
+                        df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ બાકી'
+                        changed = True
+                else:
+                    if status_val != 'પેન્ડિંગ':
+                        df.at[real_index, 'સ્ટેટસ'] = 'પેન્ડિંગ'
+                        changed = True
+                        
     if changed:
         df.to_csv(DATA_FILE, index=False)
         user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy()
@@ -232,7 +257,7 @@ with tab1:
 
 with tab2:
     st.subheader("⚖️ પ્રથમ અપીલની વિગતો અને સુનાવણી તારીખ")
-    first_rtis = user_df[user_df['સ્ટેટસ'].isin(['પેન્ડિંગ', 'પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટस' in user_df.columns else pd.DataFrame()
+    first_rtis = user_df[user_df['સ્ટેટસ'].isin(['પેન્ડિંગ', 'પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
     if not first_rtis.empty:
         selected_rti = st.selectbox("RTI પસંદ કરો", first_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']} (સ્ટેટસ: {x['સ્ટેટસ']})", axis=1), key="fa_select")
         rti_id = selected_rti.split(" - ")[0].replace("ID: ", "").strip()
@@ -241,7 +266,7 @@ with tab2:
         with st.form("first_appeal_form"):
             col_a, col_b = st.columns(2)
             with col_a:
-                fa_date_val = pd.to_datetime(e_row.get('FAA_તારીખ')).date() if pd.notna(e_row.get('FAA_તારીખ')) and str(e_row.get('FAA_તારીખ')) != "" else date.today()
+                fa_date_val = pd.to_datetime(e_row.get('FAA_તારીખ')).date() if pd.notna(e_row.get('FAA_તારીખ')) and str(e_row.get('FAA_તારીખ')) != "" and str(e_row.get('FAA_તારીખ')) != "NaT" else date.today()
                 faa_date = st.date_input("અપીલ કર્યાની તારીખ", value=fa_date_val)
                 
                 hearing_val = str(e_row.get('FAA_સુનાવણી_તારીખ', ''))
@@ -285,7 +310,7 @@ with tab3:
         with st.form("second_appeal_form"):
             col_a, col_b = st.columns(2)
             with col_a:
-                sa_date_val = pd.to_datetime(e_row_sa.get('SA_તારીખ')).date() if pd.notna(e_row_sa.get('SA_તારીખ')) and str(e_row_sa.get('SA_તારીખ')) != "" else date.today()
+                sa_date_val = pd.to_datetime(e_row_sa.get('SA_તારીખ')).date() if pd.notna(e_row_sa.get('SA_તારીખ')) and str(e_row_sa.get('SA_તારીખ')) != "" and str(e_row_sa.get('SA_તારીખ')) != "NaT" else date.today()
                 sa_date = st.date_input("બીજી અપીલની તારીખ", value=sa_date_val)
                 
                 sa_hearing_val = str(e_row_sa.get('SA_સુનાવણી_તારીખ', ''))
