@@ -15,15 +15,15 @@ header {visibility: hidden;}
 .block-container { background-color: #f8f9fa; border: 2px solid #cfd8dc; border-radius: 12px; padding: 1.5rem 1rem !important; box-shadow: 0px 4px 12px rgba(0,0,0,0.1); margin-top: 1rem; }
 button[kind="primary"] { background: linear-gradient(to right, #e53935, #ef5350) !important; color: white !important; font-weight: bold !important; border-radius: 6px !important; border: none !important; }
 div[data-testid="stFormSubmitButton"] button { background: linear-gradient(to right, #1976d2, #42a5f5) !important; }
-.box { padding: 10px; border-radius: 8px; text-align: center; color: white; font-family: sans-serif; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin-bottom: 8px; }
+.box { padding: 8px; border-radius: 8px; text-align: center; color: white; font-family: sans-serif; box-shadow: 2px 2px 5px rgba(0,0,0,0.2); margin-bottom: 8px; }
 .blue-box { background: linear-gradient(to right, #3b5998, #4c70ba); }
 .green-box { background: linear-gradient(to right, #4CAF50, #66bb6a); }
 .red-box { background: linear-gradient(to right, #f44336, #ef5350); }
 .orange-box { background: linear-gradient(to right, #ff9800, #ffb74d); }
 .purple-box { background: linear-gradient(to right, #9c27b0, #ba68c8); }
-.number-text { font-size: 24px; font-weight: bold; margin: 0; }
-.table-header { background-color: #3b5998; color: white; padding: 8px; border-radius: 6px; font-weight: bold; text-align: center; margin-bottom: 6px; font-size: 14px; }
-.table-row { background-color: white; padding: 8px; border-radius: 6px; border: 1px solid #cfd8dc; text-align: center; margin-bottom: 6px; font-size: 14px; }
+.number-text { font-size: 22px; font-weight: bold; margin: 0; }
+.table-header { background-color: #3b5998; color: white; padding: 8px; border-radius: 6px; font-weight: bold; text-align: center; margin-bottom: 6px; font-size: 13px; }
+.table-row { background-color: white; padding: 8px; border-radius: 6px; border: 1px solid #cfd8dc; text-align: center; margin-bottom: 6px; font-size: 13px; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -77,8 +77,8 @@ with st.sidebar:
         st.query_params.clear()
         st.rerun()
 
-DATA_FILE = "rti_data_v5.csv"
-EXTRA_DOCS_FILE = "rti_extra_docs_v5.csv"
+DATA_FILE = "rti_data_v6.csv"
+EXTRA_DOCS_FILE = "rti_extra_docs_v6.csv"
 UPLOAD_FOLDER = "uploads"
 
 if not os.path.exists(UPLOAD_FOLDER):
@@ -94,20 +94,19 @@ def save_uploaded_file(uploaded_file):
 
 def load_data():
     cols = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
-            'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_તારીખ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
-            'SA_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
+            'FAA_તારીખ', 'FAA_સુનાવણી_તારીખ', 'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
+            'SA_તારીખ', 'SA_સુનાવણી_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
     if os.path.exists(DATA_FILE):
         try:
             df = pd.read_csv(DATA_FILE, dtype=str)
             if df.empty or 'RTI_તારીખ' not in df.columns:
                 return pd.DataFrame(columns=cols)
-            for col in df.columns:
-                if 'સ્ટેટ' in col or 'status' in col.lower():
-                    df.rename(columns={col: 'સ્ટેટસ'}, inplace=True)
-            if 'સ્ટેટસ' not in df.columns:
-                df['સ્ટેટસ'] = 'પેન્ડિંગ'
+            for col in cols:
+                if col not in df.columns:
+                    df[col] = ""
             df['RTI_તારીખ'] = pd.to_datetime(df['RTI_તારીખ'], errors='coerce').dt.date
             df['FAA_તારીખ'] = pd.to_datetime(df['FAA_તારીખ'], errors='coerce').dt.date
+            df['SA_તારીખ'] = pd.to_datetime(df['SA_તારીખ'], errors='coerce').dt.date
             return df
         except Exception:
             return pd.DataFrame(columns=cols)
@@ -126,21 +125,26 @@ extra_docs_df = load_extra_docs()
 if not user_df.empty and 'સ્ટેટસ' not in user_df.columns:
     user_df['સ્ટેટસ'] = 'પેન્ડિંગ'
 
-# --- ઓટોમેટિક લોજિક ---
+# --- ઓટોમેટિક લોજિક (૩૦ અને ૪૫ દિવસ ચેક કરવા માટે) ---
 if not user_df.empty:
     today = date.today()
     changed = False
     for index, row in user_df.iterrows():
         real_index = df[df['ID'] == row['ID']].index[0]
         status_val = str(row.get('સ્ટેટસ', 'પેન્ડિંગ'))
+        
+        # જો પેન્ડિંગ હોય અને ૩૦ દિવસ વીતી ગયા હોય અને પ્રથમ અપીલની તારીખ ન નાખી હોય
         if status_val == 'પેન્ડિંગ' and pd.notna(row.get('RTI_તારીખ')):
-            if (today - row['RTI_તારીખ']).days > 30:
+            if (today - row['RTI_તારીખ']).days > 30 and not str(row.get('FAA_તારીખ', '')):
                 df.at[real_index, 'સ્ટેટસ'] = 'પ્રથમ અપીલ બાકી'
                 changed = True
+                
+        # જો પ્રથમ અપીલ પેન્ડિંગ હોય અને અપીલ તારીખથી ૪૫ દિવસ વીતી ગયા હોય
         elif status_val == 'પ્રથમ અપીલ પેન્ડિંગ' and pd.notna(row.get('FAA_તારીખ')):
-            if (today - row['FAA_તારીખ']).days > 45:
+            if (today - row['FAA_તારીખ']).days > 45 and not str(row.get('SA_તારીખ', '')):
                 df.at[real_index, 'સ્ટેટસ'] = 'બીજી અપીલ બાકી'
                 changed = True
+                
     if changed:
         df.to_csv(DATA_FILE, index=False)
         user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy()
@@ -165,20 +169,21 @@ else:
 
 total_rti = len(user_df) if not user_df.empty else 0
 pending_rti = len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
-first_appeal = len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
-second_appeal = len(user_df[user_df["સ્ટેટસ"].isin(["બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+first_appeal_count = len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
+second_appeal_count = len(user_df[user_df["સ્ટેટસ"].isin(["બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty and "સ્ટેટસ" in user_df.columns else 0
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1: st.markdown(f'<div class="box blue-box"><small>કુલ RTI</small><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
 with c2: st.markdown(f'<div class="box orange-box"><small>પેન્ડિંગ</small><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
-with c3: st.markdown(f'<div class="box red-box"><small>પ્રથમ અપીલ</small><p class="number-text">{first_appeal}</p></div>', unsafe_allow_html=True)
-with c4: st.markdown(f'<div class="box purple-box"><small>બીજી અપીલ</small><p class="number-text">{second_appeal}</p></div>', unsafe_allow_html=True)
+with c3: st.markdown(f'<div class="box red-box"><small>પ્રથમ અપીલ</small><p class="number-text">{first_appeal_count}</p></div>', unsafe_allow_html=True)
+with c4: st.markdown(f'<div class="box purple-box"><small>બીજી અપીલ</small><p class="number-text">{second_appeal_count}</p></div>', unsafe_allow_html=True)
 with c5: st.markdown(f'<div class="box green-box"><small>નિકાલ</small><p class="number-text">{nikal_rti}</p></div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & ડિલીટ"])
+# --- ટેબ્સની નવી ગોઠવણી ---
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(["🆕 નવી RTI", "⚠️ પ્રથમ અપીલ બાકી", "⚖️ પ્રથમ અપીલ", "⚠️ બીજી અપીલ બાકી", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & ડિલીટ"])
 
 with tab1:
     with st.form("new_rti_form", clear_on_submit=True):
@@ -212,52 +217,114 @@ with tab1:
             st.rerun()
 
 with tab2:
-    pending_rtis = user_df[user_df['સ્ટેટસ'].isin(['પેન્ડિંગ', 'પ્રથમ અપીલ બાકી'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
-    if not pending_rtis.empty:
-        selected_rti = st.selectbox("RTI પસંદ કરો", pending_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
+    st.subheader("⚠️ જે RTI ની અપીલ કરવાનો સમય થઈ ગયો છે")
+    due_first = user_df[user_df['સ્ટેટસ'] == 'પ્રથમ અપીલ બાકી'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    if not due_first.empty:
+        for i, row in due_first.iterrows():
+            st.markdown(f"""
+            <div style="background: white; padding: 12px; border-left: 5px solid #ff9800; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <b>ID:</b> {row['ID']} | <b>કચેરી:</b> {row['PIO_કચેરી']} | <b>RTI તારીખ:</b> {row['RTI_તારીખ']} <br>
+                <span style="color: #d32f2f; font-weight: bold;">૩૦ દિવસ પૂરા થઈ ગયા છે, પ્રથમ અપીલ કરવાની બાકી છે!</span>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("કોઈ અરજી પ્રથમ અપીલ બાકીમાં નથી.")
+
+with tab3:
+    st.subheader("⚖️ પ્રથમ અપીલની વિગતો અને સુનાવણી તારીખ")
+    first_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    if not first_rtis.empty:
+        selected_rti = st.selectbox("RTI પસંદ કરો", first_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1), key="fa_select")
         rti_id = selected_rti.split(" - ")[0].replace("ID: ", "").strip()
+        e_row = user_df[user_df['ID'] == rti_id].iloc[0]
+        
         with st.form("first_appeal_form"):
             col_a, col_b = st.columns(2)
             with col_a:
-                faa_date = st.date_input("અપીલ કર્યાની તારીખ")
-                faa_name = st.text_input("પ્રથમ અપીલ અધિકારી શ્રી નું નામ/હોદ્દો")
-                faa_address = st.text_area("સરનામું (પ્રથમ અપીલ)")
+                fa_date_val = pd.to_datetime(e_row.get('FAA_તારીખ')).date() if pd.notna(e_row.get('FAA_તારીખ')) and str(e_row.get('FAA_તારીખ')) != "" else date.today()
+                faa_date = st.date_input("અપીલ કર્યાની તારીખ", value=fa_date_val)
+                
+                hearing_val = str(e_row.get('FAA_સુનાવણી_તારીખ', ''))
+                faa_hearing = st.text_input("સુનાવણીની તારીખ (જો પત્ર આવ્યો હોય તો)", value=hearing_val, placeholder="તારીખ અથવા વિગત લખો...")
+                
+                faa_name = st.text_input("પ્રથમ અપીલ અધિકારી શ્રી નું નામ/હોદ્દો", value=str(e_row.get('FAA_અધિકારી', '')))
+                faa_address = st.text_area("સરનામું (પ્રથમ અપીલ)", value=str(e_row.get('FAA_સરનામું', '')))
             with col_b:
-                faa_pin = st.text_input("પિન કોડ")
-                faa_mob = st.text_input("મોબાઈલ નંબર")
-                faa_speed = st.text_input("સ્પીડ પોસ્ટ ટ્રેકિંગ નંબર")
+                faa_pin = st.text_input("પિન કોડ", value=str(e_row.get('FAA_પિનકોડ', '')))
+                faa_mob = st.text_input("મોબાઈલ નંબર", value=str(e_row.get('FAA_મોબાઈલ', '')))
+                faa_speed = st.text_input("સ્પીડ પોસ્ટ ટ્રેકિંગ નંબર", value=str(e_row.get('FAA_સ્પીડપોસ્ટ', '')))
                 faa_file = st.file_uploader("પ્રથમ અપીલની PDF", type=["pdf", "png", "jpg"])
-            if st.form_submit_button("SAVE RTI"):
+            
+            if st.form_submit_button("SAVE FIRST APPEAL"):
                 r_idx = df[df['ID'] == rti_id].index[0]
-                df.at[r_idx, 'FAA_અધિકારી'], df.at[r_idx, 'FAA_સરનામું'], df.at[r_idx, 'FAA_પિનકોડ'], df.at[r_idx, 'FAA_મોબાઈલ'], df.at[r_idx, 'FAA_તારીખ'], df.at[r_idx, 'FAA_સ્પીડપોસ્ટ'], df.at[r_idx, 'FAA_ફાઈલ'], df.at[r_idx, 'સ્ટેટસ'] = faa_name, faa_address, faa_pin, faa_mob, faa_date, faa_speed, save_uploaded_file(faa_file), 'પ્રથમ અપીલ પેન્ડિંગ'
+                df.at[r_idx, 'FAA_તારીખ'] = faa_date
+                df.at[r_idx, 'FAA_સુનાવણી_તારીખ'] = faa_hearing
+                df.at[r_idx, 'FAA_અધિકારી'] = faa_name
+                df.at[r_idx, 'FAA_સરનામું'] = faa_address
+                df.at[r_idx, 'FAA_પિનકોડ'] = faa_pin
+                df.at[r_idx, 'FAA_મોબાઈલ'] = faa_mob
+                df.at[r_idx, 'FAA_સ્પીડપોસ્ટ'] = faa_speed
+                if faa_file is not None:
+                    df.at[r_idx, 'FAA_ફાઈલ'] = save_uploaded_file(faa_file)
+                df.at[r_idx, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
                 df.to_csv(DATA_FILE, index=False)
-                st.success("પ્રથમ અપીલ દાખલ થઈ ગઈ છે!")
+                st.success("પ્રથમ અપીલ સફળતાપૂર્વક સેવ થઈ ગઈ છે!")
                 st.rerun()
-    else: st.info("કોઈ અરજી પ્રથમ અપીલ માટે બાકી નથી.")
+    else: 
+        st.info("કોઈ અરજી પ્રથમ અપીલ માટે ઉપલબ્ધ નથી.")
 
-with tab3:
-    appeal_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ પેન્ડિંગ', 'બીજી અપીલ બાકી'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
-    if not appeal_rtis.empty:
-        selected_sa = st.selectbox("અરજી પસંદ કરો", appeal_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
+with tab4:
+    st.subheader("⚠️ જે પ્રથમ અપીલના ૪૫ દિવસ પૂરા થઈ ગયા છે")
+    due_second = user_df[user_df['સ્ટેટસ'] == 'બીજી અપીલ બાકી'] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    if not due_second.empty:
+        for i, row in due_second.iterrows():
+            st.markdown(f"""
+            <div style="background: white; padding: 12px; border-left: 5px solid #9c27b0; border-radius: 6px; margin-bottom: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <b>ID:</b> {row['ID']} | <b>કચેરી:</b> {row['PIO_કચેરી']} | <b>અપીલ તારીખ:</b> {row['FAA_તારીખ']} <br>
+                <span style="color: #9c27b0; font-weight: bold;">૪૫ દિવસ પૂરા થઈ ગયા છે, ગુજરાત માહિતી આયોગમાં બીજી અપીલ કરવાની બાકી છે!</span>
+            </div>
+            """, unsafe_allow_html=True)
+    else:
+        st.info("કોઈ અરજી બીજી અપીલ બાકીમાં નથી.")
+
+with tab5:
+    st.subheader("🏛️ બીજી અપીલ (ગુજરાત માહિતી આયોગ) વિગતો")
+    second_rtis = user_df[user_df['સ્ટેટસ'].isin(['બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])] if not user_df.empty and 'સ્ટેટસ' in user_df.columns else pd.DataFrame()
+    if not second_rtis.empty:
+        selected_sa = st.selectbox("અરજી પસંદ કરો", second_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1), key="sa_select")
         sa_id = selected_sa.split(" - ")[0].replace("ID: ", "").strip()
+        e_row_sa = user_df[user_df['ID'] == sa_id].iloc[0]
+        
         st.info("**🏛️ ગુજરાત માહિતી આયોગ** | **સરનામું:** કર્મયોગી ભવન, ગાંધીનગર - 382010")
         with st.form("second_appeal_form"):
             col_a, col_b = st.columns(2)
             with col_a:
-                sa_date = st.date_input("બીજી અપીલની તારીખ")
-                sa_speed = st.text_input("સ્પીડ પોસ્ટ નંબર")
+                sa_date_val = pd.to_datetime(e_row_sa.get('SA_તારીખ')).date() if pd.notna(e_row_sa.get('SA_તારીખ')) and str(e_row_sa.get('SA_તારીખ')) != "" else date.today()
+                sa_date = st.date_input("બીજી અપીલની તારીખ", value=sa_date_val)
+                
+                sa_hearing_val = str(e_row_sa.get('SA_સુનાવણી_તારીખ', ''))
+                sa_hearing = st.text_input("બીજી અપીલ સુનાવણીની તારીખ", value=sa_hearing_val, placeholder="તારીખ અથવા વિગત લખો...")
+                
+                sa_speed = st.text_input("સ્પીડ પોસ્ટ નંબર", value=str(e_row_sa.get('SA_સ્પીડપોસ્ટ', '')))
             with col_b:
                 sa_file = st.file_uploader("બીજી અપીલની PDF", type=["pdf", "png", "jpg"])
-            if st.form_submit_button("SAVE RTI"):
+            
+            if st.form_submit_button("SAVE SECOND APPEAL"):
                 r_idx = df[df['ID'] == sa_id].index[0]
-                df.at[r_idx, 'SA_તારીખ'], df.at[r_idx, 'SA_સ્પીડપોસ્ટ'], df.at[r_idx, 'SA_ફાઈલ'], df.at[r_idx, 'સ્ટેટસ'] = sa_date, sa_speed, save_uploaded_file(sa_file), 'બીજી અપીલ પેન્ડિંગ'
+                df.at[r_idx, 'SA_તારીખ'] = sa_date
+                df.at[r_idx, 'SA_સુનાવણી_તારીખ'] = sa_hearing
+                df.at[r_idx, 'SA_સ્પીડપોસ્ટ'] = sa_speed
+                if sa_file is not None:
+                    df.at[r_idx, 'SA_ફાઈલ'] = save_uploaded_file(sa_file)
+                df.at[r_idx, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
                 df.to_csv(DATA_FILE, index=False)
-                st.success("બીજી અપીલ નોંધાઈ ગઈ છે!")
+                st.success("બીજી અપીલ સફળતાપૂર્વક સેવ થઈ ગઈ છે!")
                 st.rerun()
-    else: st.info("કોઈ અરજી બીજી અપીલ માટે બાકી નથી.")
+    else: 
+        st.info("કોઈ અરજી બીજી અપીલ માટે ઉપલબ્ધ નથી.")
 
-# TAB 4: મેનેજમેન્ટ, એડિટ અને ડિલીટ ઓપ્શન
-with tab4:
+# TAB 6: મેનેજમેન્ટ, એડિટ અને ડિલીટ ઓપ્શન
+with tab6:
     st.subheader("📊 એક્સેલ રિપોર્ટ ડાઉનલોડ કરો")
     csv = filtered_df.to_csv(index=False).encode('utf-8-sig') if not filtered_df.empty else ""
     st.download_button(label="📥 તમારો ડેટા એક્સેલમાં ડાઉનલોડ કરો", data=csv, file_name="RTI_Report.csv", mime="text/csv")
@@ -318,7 +385,7 @@ if st.session_state['manage_action_id']:
         st.write("**મૂળ અરજીઓ (બ્રાઉઝરમાં જુઓ અથવા ડાઉનલોડ કરો):**")
         
         def display_file_options(file_path, label_name):
-            if pd.notna(file_path) and str(file_path) != "ફાઈલ નથી" and os.path.exists(str(file_path)):
+            if pd.notna(file_path) and str(file_path) != "ફાઈલ નથી" and str(file_path) != "" and os.path.exists(str(file_path)):
                 st.markdown(f"**{label_name}**")
                 col_v, col_d = st.columns(2)
                 with col_v:
@@ -361,7 +428,7 @@ if st.session_state['manage_action_id']:
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ==========================================
-# પ્રોફેશનલ ટેબલ ફોર્મેટ
+# પ્રોફેશનल ટેબલ ફોર્મેટ (મુખ્ય યાદી)
 # ==========================================
 def render_professional_table(df_subset, tab_key):
     if df_subset.empty:
@@ -392,11 +459,11 @@ def render_professional_table(df_subset, tab_key):
 
 st.markdown("---")
 st.subheader("તમારી અરજીઓનું લિસ્ટ અને નિકાલ")
-list_tab1, list_tab2, list_tab3 = st.tabs(["આખી યાદી (All)", "પ્રથમ અપીલમાં ગયેલી", "બીજી અપીલમાં (આયોગમાં) ગયેલી"])
+list_tab1, list_tab2, list_tab3 = st.tabs(["આખી યાદી (All)", "પેન્ડિંગ અરજીઓ", "નિકાલ થયેલ"])
 
 with list_tab1: render_professional_table(filtered_df, "all")
-with list_tab2: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પ્રથમ અપીલ પેન્ડિંગ'])] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "first")
-with list_tab3: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'].isin(['બીજી અપીલ બાકી', 'બીજી અપીલ પેન્ડિંગ'])] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "second")
+with list_tab2: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'] == 'પેન્ડિંગ'] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "pending")
+with list_tab3: render_professional_table(filtered_df[filtered_df['સ્ટેટસ'] == 'નિકાલ'] if not filtered_df.empty and 'સ્ટેટસ' in filtered_df.columns else pd.DataFrame(), "nikal")
 
 st.markdown("<br>", unsafe_allow_html=True)
 st.markdown("#### ✅ અરજીનો નિકાલ (જવાબ આવી ગયો હોય તો)")
