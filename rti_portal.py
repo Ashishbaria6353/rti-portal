@@ -8,21 +8,11 @@ from google.oauth2.service_account import Credentials
 
 st.set_page_config(page_title="RTI Manage Portal", layout="wide")
 
-# --- સ્માર્ટ ગૂગલ શીટ કનેક્શન (લોકલ અને ક્લાઉડ બંને માટે) ---
+# --- ગૂગલ શીટ કનેક્શન સેટઅપ ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-
-try:
-    # જો એપ Streamlit Cloud (ઓનલાઈન) પર ચાલતી હશે તો Secrets વાપરશે
-    creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
-except:
-    # જો એપ તમારા કમ્પ્યુટરમાં ચાલતી હશે તો સીધી credentials.json ફાઈલ વાપરશે
-    from oauth2client.service_account import ServiceAccountCredentials
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
-
+creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
-
-# --- શાનદાર કલર અને ડિઝાઇન માટેની CSS ---
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;}
