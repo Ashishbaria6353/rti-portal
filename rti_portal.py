@@ -5,8 +5,8 @@ import os
 import base64
 import gspread
 
-# --- પેજ સેટઅપ (આકર્ષક લુક માટે) ---
-st.set_page_config(page_title="RTI Manage Portal", page_icon="🏛️", layout="wide")
+# --- પેજ સેટઅપ ---
+st.set_page_config(page_title="RTI Manage Portal", layout="wide")
 
 # --- સ્માર્ટ અને પરફેક્ટ ગૂગલ શીટ કનેક્શન ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -20,12 +20,12 @@ except:
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
 
-# --- શાનદાર CSS ડિઝાઇન (ઓફિસિયલ લુક) ---
+# --- શાનદાર CSS ડિઝાઇન ---
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
 .block-container { background-color: #f4f7f6; padding: 1.5rem 1rem !important; }
-.login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 8px 16px rgba(0,0,0,0.1); max-width: 400px; margin: auto; border-top: 4px solid #1e3a8a; }
+.login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 8px 16px rgba(0,0,0,0.1); max-width: 450px; margin: auto; border-top: 4px solid #1e3a8a; }
 .box { padding: 15px 10px; border-radius: 8px; text-align: center; color: white; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); margin-bottom: 12px; }
 .b-blue { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }          
 .b-orange { background: linear-gradient(135deg, #ea580c, #f97316); }       
@@ -41,7 +41,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- પરમેનન્ટ લૉગિન સિસ્ટમ (મોબાઈલ અને લેપટોપ ફ્રેન્ડલી) ---
+# --- પરમેનન્ટ લૉગિન સિસ્ટમ ---
 if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
 if 'user_name' not in st.session_state: st.session_state['user_name'] = ""
 if 'user_mobile' not in st.session_state: st.session_state['user_mobile'] = ""
@@ -51,17 +51,17 @@ if not st.session_state['logged_in']:
     st.markdown("<br><br><br>", unsafe_allow_html=True)
     st.markdown("""
         <div class="login-card">
-            <h2 style='text-align: center; color: #1e3a8a; margin-top: 0;'>🏛️ RTI PORTAL</h2>
-            <p style='text-align: center; color: gray;'>સિસ્ટમમાં પ્રવેશ કરવા વિગતો ભરો</p>
+            <h2 style='text-align: center; color: #1e3a8a; margin-top: 0;'>RTI MANAGE PORTAL માં આપનું સ્વાગત છે</h2>
+            <p style='text-align: center; color: gray;'>કૃપા કરીને આગળ વધવા માટે નામ અને મોબાઈલ નંબર દાખલ કરો</p>
         </div>
     """, unsafe_allow_html=True)
     
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
         with st.form("login_form"):
-            u_name = st.text_input("👤 તમારું પૂરું નામ")
-            u_mob = st.text_input("📱 તમારો મોબાઈલ નંબર")
-            if st.form_submit_button("Secure Login 🔒", use_container_width=True):
+            u_name = st.text_input("તમારું પૂરું નામ")
+            u_mob = st.text_input("તમારો મોબાઈલ નંબર")
+            if st.form_submit_button("લૉગિન કરો (Login)", type="primary", use_container_width=True):
                 if u_name and u_mob:
                     st.session_state.update({'logged_in': True, 'user_name': u_name, 'user_mobile': str(u_mob)})
                     st.rerun()
@@ -71,10 +71,10 @@ if not st.session_state['logged_in']:
 
 # --- સાઈડબાર અને લૉગઆઉટ બટન ---
 with st.sidebar:
-    st.markdown("### 👤 પ્રોફાઈલ વિગતો")
+    st.markdown("### 👤 તમારું પ્રોફાઈલ")
     st.info(f"**નામ:**\n{st.session_state['user_name']}\n\n**મોબાઈલ:**\n{st.session_state['user_mobile']}")
     st.divider()
-    if st.button("🚪 લૉગઆઉટ (Logout)", type="primary", use_container_width=True):
+    if st.button("લૉગઆઉટ કરો (Logout)", type="primary", use_container_width=True):
         st.session_state.clear()
         st.rerun()
 
@@ -91,7 +91,6 @@ def save_uploaded_file(uploaded_file):
         return file_path
     return ""
 
-# --- ગૂગલ શીટ ડેટા લોડ ---
 def load_data():
     try:
         data = sheet.get_all_records()
@@ -109,7 +108,7 @@ def save_data_to_sheet(df):
 
 df = load_data()
 
-# --- ઓટોમેટિક તારીખ લૉજિક (30 દિવસ અને 45 દિવસ વાળી સિસ્ટમ) ---
+# --- ઓટોમેટિક તારીખ લૉજિક ---
 updated = False
 today = date.today()
 if not df.empty:
@@ -123,13 +122,11 @@ if not df.empty:
         rti_dt = pd.to_datetime(rti_str, errors='coerce').date() if rti_str and rti_str != "nan" else None
         faa_dt = pd.to_datetime(faa_str, errors='coerce').date() if faa_str and faa_str != "nan" else None
         
-        # પ્રથમ અપીલ માટે 30 દિવસ ચેક કરો (દા.ત. 21/04/2026)
         if rti_dt and pd.notna(rti_dt) and not faa_dt:
             if (today - rti_dt).days > 30 and status == 'પેન્ડિંગ':
                 df.at[i, 'સ્ટેટસ'] = 'પ્રથમ અપીલ બાકી'
                 updated = True
                 
-        # બીજી અપીલ માટે 45 દિવસ ચેક કરો
         if faa_dt and pd.notna(faa_dt):
             if (today - faa_dt).days > 45 and status == 'પ્રથમ અપીલ પેન્ડિંગ':
                 df.at[i, 'સ્ટેટસ'] = 'બીજી અપીલ બાકી'
@@ -138,27 +135,26 @@ if not df.empty:
     if updated:
         save_data_to_sheet(df)
 
-# યુઝરનો જ ડેટા ફિલ્ટર કરો
 user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy() if not df.empty else pd.DataFrame(columns=ALL_COLS)
 
-# --- ટોચનું હેડર ---
+# --- ટોચનું હેડર (Home બટન આઇકોન વગર) ---
 col_home, col_title, col_search = st.columns([1, 2, 1.5])
 with col_home:
-    if st.button("🏠 Home", use_container_width=True):
+    if st.button("Home", use_container_width=True):
         st.session_state['manage_action_id'] = None
         st.rerun()
 with col_title:
-    st.markdown("<h2 style='text-align: center; color: #1e3a8a; font-weight: bold; margin:0;'>🏛️ RTI MANAGE PORTAL</h2>", unsafe_allow_html=True)
+    st.markdown("<h2 style='text-align: center; color: #1e3a8a; font-weight: bold; margin:0;'>RTI MANAGE PORTAL</h2>", unsafe_allow_html=True)
 with col_search:
     search_term = st.text_input("🔍 સર્ચ કરો:", placeholder="ID કે કચેરી શોધો...", label_visibility="collapsed")
 
 st.markdown("<hr style='border: 1px solid #cfd8dc; margin: 10px 0;'>", unsafe_allow_html=True)
 
-# --- કાઉન્ટર ડેટા મેળવો ---
+# --- કાઉન્ટર ડેટા (પેન્ડિંગ લૉજિક સુધારો) ---
 total_rti = len(user_df)
-pending_rti = len(user_df[user_df["સ્ટેટસ"] == "પેન્ડિંગ"]) if not user_df.empty else 0
+pending_rti = len(user_df[user_df["સ્ટેટસ"] != "નિકાલ"]) if not user_df.empty else 0
 first_due = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]) if not user_df.empty else 0
-first_done = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ પેન્ડિંગ"]) if not user_df.empty else 0
+first_done = len(user_df[user_df["સ્ટેટસ"].isin(["પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ"])]) if not user_df.empty else 0
 second_due = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ બાકી"]) if not user_df.empty else 0
 second_done = len(user_df[user_df["સ્ટેટસ"] == "બીજી અપીલ પેન્ડિંગ"]) if not user_df.empty else 0
 nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if not user_df.empty else 0
@@ -166,7 +162,7 @@ nikal_rti = len(user_df[user_df["સ્ટેટસ"] == "નિકાલ"]) if 
 # --- કલરફુલ બોક્સ ---
 r1_c1, r1_c2, r1_c3, r1_c4 = st.columns(4)
 with r1_c1: st.markdown(f'<div class="box b-blue"><p class="label-text">કુલ RTI</p><p class="number-text">{total_rti}</p></div>', unsafe_allow_html=True)
-with r1_c2: st.markdown(f'<div class="box b-orange"><p class="label-text">પેન્ડિંગ (30 દિવસની અંદર)</p><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
+with r1_c2: st.markdown(f'<div class="box b-orange"><p class="label-text">પેન્ડિંગ (કુલ બાકી)</p><p class="number-text">{pending_rti}</p></div>', unsafe_allow_html=True)
 with r1_c3: st.markdown(f'<div class="box b-brown"><p class="label-text">પ્રથમ અપીલ બાકી</p><p class="number-text">{first_due}</p></div>', unsafe_allow_html=True)
 with r1_c4: st.markdown(f'<div class="box b-red"><p class="label-text">પ્રથમ અપીલ કરેલ</p><p class="number-text">{first_done}</p></div>', unsafe_allow_html=True)
 
@@ -192,7 +188,7 @@ with tab1:
             pio_pin = st.text_input("પિન કોડ")
             pio_mob = st.text_input("મોબાઈલ નંબર")
             rti_speed = st.text_input("સ્પીડ પોસ્ટ નંબર")
-            rti_file = st.file_uploader("PDF ફાઈલ અપલોડ કરો", type=["pdf"])
+            rti_file = st.file_uploader("PDF ફાઈલ અપલોડ કરો", type=["pdf", "png", "jpg"])
         
         if st.form_submit_button("SAVE RTI"):
             new_id = "1" if df.empty else str(int(pd.to_numeric(df['ID'], errors='coerce').dropna().max() + 1))
@@ -209,7 +205,6 @@ with tab1:
 with tab2:
     first_rtis = user_df[user_df['સ્ટેટસ'].isin(['પ્રથમ અપીલ બાકી', 'પેન્ડિંગ'])] if not user_df.empty else pd.DataFrame()
     if not first_rtis.empty:
-        st.info("અહીં એ અરજીઓ દેખાશે જેનો સમય પૂરો થવામાં છે અથવા 30 દિવસ થઈ ગયા છે.")
         selected_rti = st.selectbox("RTI પસંદ કરો", first_rtis.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']} ({x['સ્ટેટસ']})", axis=1))
         rti_id = selected_rti.split(" - ")[0].replace("ID: ", "").strip()
         e_row = user_df[user_df['ID'] == rti_id].iloc[0]
@@ -307,12 +302,19 @@ if st.session_state['manage_action_id']:
         show_pdf(m_row.get('SA_ફાઈલ'), "બીજી અપીલ ફાઈલ")
 
 st.markdown("---")
+
+# --- લિસ્ટ અને ડ્રોપડાઉન ફિલ્ટર ---
 st.subheader("તમારી અરજીઓનું લિસ્ટ")
+filter_option = st.selectbox("📂 સ્ટેટસ મુજબ અરજીઓ ફિલ્ટર કરો:", ["બધી અરજીઓ", "પેન્ડિંગ અરજીઓ", "પ્રથમ અપીલ બાકી", "પ્રથમ અપીલ પેન્ડિંગ", "બીજી અપીલ બાકી", "બીજી અપીલ પેન્ડિંગ", "નિકાલ થયેલ"])
 
 if not user_df.empty:
-    filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)] if search_term else user_df
+    if search_term:
+        filtered_df = user_df[user_df.apply(lambda row: row.astype(str).str.contains(search_term, case=False).any(), axis=1)]
+    else:
+        if filter_option == "પેન્ડિંગ અરજીઓ": filtered_df = user_df[user_df["સ્ટેટસ"] != "નિકાલ"]
+        elif filter_option == "બધી અરજીઓ": filtered_df = user_df
+        else: filtered_df = user_df[user_df["સ્ટેટસ"] == filter_option]
     
-    # લિસ્ટના હેડરમાં 'RTI Date' પાછી ઉમેરી દીધી
     h1, h2, h3, h4, h5, h6, h7 = st.columns([0.6, 1.2, 1.8, 2.2, 1.5, 1.5, 1.2])
     with h1: st.markdown('<div class="table-header">Sr.</div>', unsafe_allow_html=True)
     with h2: st.markdown('<div class="table-header">ID</div>', unsafe_allow_html=True)
@@ -328,7 +330,7 @@ if not user_df.empty:
         with r2: st.markdown(f'<div class="table-row"><b>{row["ID"]}</b></div>', unsafe_allow_html=True)
         with r3: st.markdown(f'<div class="table-row">{st.session_state["user_name"]}</div>', unsafe_allow_html=True)
         with r4: st.markdown(f'<div class="table-row">{row.get("PIO_કચેરી", "-")}</div>', unsafe_allow_html=True)
-        with r5: st.markdown(f'<div class="table-row">{row.get("RTI_તારીખ", "-")}</div>', unsafe_allow_html=True) # તારીખ બતાવશે
+        with r5: st.markdown(f'<div class="table-row">{row.get("RTI_તારીખ", "-")}</div>', unsafe_allow_html=True) 
         with r6: st.markdown(f'<div class="table-row"><b>{row.get("સ્ટેટસ", "-")}</b></div>', unsafe_allow_html=True)
         with r7:
             if st.button("👁️ જુઓ", key=f"btn_{row['ID']}", use_container_width=True):
