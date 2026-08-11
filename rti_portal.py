@@ -15,7 +15,8 @@ try:
 except:
     # કમ્પ્યુટર લોકલ માટે (credentials.json નો ઉપયોગ)
     from oauth2client.service_account import ServiceAccountCredentials
-    creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
+from google.oauth2.service_account import Credentials
+creds = Credentials.from_service_account_info(st.secrets["gcp_service_account"], scopes=scope)
 
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
