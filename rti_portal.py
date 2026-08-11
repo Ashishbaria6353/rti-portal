@@ -20,12 +20,12 @@ except:
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
 
-# --- શાનદાર CSS ડિઝાઇન (હેડર ચાલુ રાખ્યું છે જેથી સ્લાઇડર બટન દેખાય) ---
+# --- શાનદાર CSS ડિઝાઇન (હેડર માર્જિન સુધારેલ છે જેથી ઉપરનો ભાગ દબાય નહીં) ---
 st.markdown("""
 <style>
-#MainMenu {visibility: hidden;} footer {visibility: hidden;} 
-/* અગાઉ અહી header છુપાવેલું હતું, જે મેં કાઢી નાખ્યું છે જેથી > બટન દેખાય */
-.block-container { background-color: #f4f7f6; padding: 1.5rem 1rem !important; }
+#MainMenu {visibility: hidden;} footer {visibility: hidden;}
+/* ઉપરનો ભાગ દબાઈ ન જાય તે માટે પેડિંગ એડજસ્ટ કર્યું છે */
+.block-container { background-color: #f4f7f6; padding-top: 3rem !important; padding-bottom: 1.5rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
 .login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 8px 16px rgba(0,0,0,0.1); max-width: 450px; margin: auto; border-top: 4px solid #1e3a8a; }
 .box { padding: 15px 10px; border-radius: 8px; text-align: center; color: white; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); margin-bottom: 12px; }
 .b-blue { background: linear-gradient(135deg, #1e3a8a, #3b82f6); }          
@@ -39,6 +39,10 @@ st.markdown("""
 .label-text { font-size: 14px; font-weight: 600; margin: 0; }
 .table-header { background-color: #1e3a8a; color: white; padding: 10px; border-radius: 6px; font-weight: bold; text-align: center; font-size: 14px; margin-bottom: 5px;}
 .table-row { background-color: white; padding: 10px; border-radius: 6px; border: 1px solid #e5e7eb; text-align: center; font-size: 14px; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 5px;}
+.detail-card { background-color: white; padding: 15px; border-radius: 8px; border-left: 4px solid #1e3a8a; box-shadow: 0px 2px 4px rgba(0,0,0,0.05); margin-bottom: 10px; }
+.detail-title { font-weight: bold; color: #1e3a8a; border-bottom: 1px solid #e5e7eb; padding-bottom: 5px; margin-bottom: 10px; }
+.detail-item { margin-bottom: 5px; font-size: 14px;}
+.detail-label { font-weight: 600; color: #4b5563; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -156,7 +160,7 @@ user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy() if not
 # --- ટોચનું હેડર (Home બટન સાથે) ---
 col_home, col_title, col_search = st.columns([1, 2, 1.5])
 with col_home:
-    if st.button("Home", use_container_width=True):
+    if st.button("🏠 Home", use_container_width=True):
         st.session_state['manage_action_id'] = None
         st.rerun()
 with col_title:
@@ -319,24 +323,62 @@ with tab4:
     else:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
 
-# --- વ્યુ (View) ફીચર ---
+# --- વ્યુ (View) ફીચર અને બધી વિગતો પ્રદર્શિત કરવી ---
 if st.session_state['manage_action_id']:
     real_m_id = st.session_state['manage_action_id']
     m_row_data = user_df[user_df['ID'] == real_m_id]
     if not m_row_data.empty:
-        st.markdown(f"<div style='background-color: #e0f2fe; padding: 15px; border-radius: 10px; margin: 15px 0;'><h4>📂 દસ્તાવેજો: ID - {real_m_id}</h4></div>", unsafe_allow_html=True)
+        st.markdown(f"<div style='background-color: #e0f2fe; padding: 15px; border-radius: 10px; margin: 15px 0;'><h4>📂 અરજીની સંપૂર્ણ વિગતો: ID - {real_m_id}</h4></div>", unsafe_allow_html=True)
         if st.button("❌ બંધ કરો", use_container_width=True):
             st.session_state['manage_action_id'] = None
             st.rerun()
         
         m_row = m_row_data.iloc[0]
+        
+        # અરજીની સંપૂર્ણ માહિતી બતાવવા માટે કાર્ડ્સ
+        c1, c2, c3 = st.columns(3)
+        
+        with c1:
+            st.markdown('<div class="detail-card">', unsafe_allow_html=True)
+            st.markdown('<div class="detail-title">📝 મૂળ RTI ની વિગતો</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">RTI તારીખ:</span> {m_row.get("RTI_તારીખ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">PIO કચેરી:</span> {m_row.get("PIO_કચેરી", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">સરનામું:</span> {m_row.get("PIO_સરનામું", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("RTI_સ્પીડપોસ્ટ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with c2:
+            st.markdown('<div class="detail-card">', unsafe_allow_html=True)
+            st.markdown('<div class="detail-title">⚖️ પ્રથમ અપીલની વિગતો</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">અપીલ તારીખ:</span> {m_row.get("FAA_તારીખ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">અધિકારી:</span> {m_row.get("FAA_અધિકારી", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">સુનાવણી તારીખ:</span> {m_row.get("FAA_સુનાવણી_તારીખ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("FAA_સ્પીડપોસ્ટ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        with c3:
+            st.markdown('<div class="detail-card">', unsafe_allow_html=True)
+            st.markdown('<div class="detail-title">🏛️ બીજી અપીલની વિગતો</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">અપીલ તારીખ:</span> {m_row.get("SA_તારીખ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">સુનાવણી તારીખ:</span> {m_row.get("SA_સુનાવણી_તારીખ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("SA_સ્પીડપોસ્ટ", "-")}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        st.markdown("#### 📄 અપલોડ કરેલા દસ્તાવેજો (PDF/Image)")
         def show_pdf(file_path, label):
             if file_path and os.path.exists(str(file_path)):
                 st.write(f"**{label}**")
-                with open(file_path, "rb") as f:
-                    base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-                st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="400px"></iframe>', unsafe_allow_html=True)
-        
+                try:
+                    with open(file_path, "rb") as f:
+                        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
+                    # Check if it's an image
+                    if str(file_path).lower().endswith(('.png', '.jpg', '.jpeg')):
+                         st.markdown(f'<img src="data:image/jpeg;base64,{base64_pdf}" width="100%">', unsafe_allow_html=True)
+                    else:
+                         st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="400px"></iframe>', unsafe_allow_html=True)
+                except Exception as e:
+                    st.error(f"ફાઈલ બતાવવામાં ભૂલ: {e}")
+
         show_pdf(m_row.get('RTI_ફાઈલ'), "RTI ફાઈલ")
         show_pdf(m_row.get('FAA_ફાઈલ'), "પ્રથમ અપીલ ફાઈલ")
         show_pdf(m_row.get('SA_ફાઈલ'), "બીજી અપીલ ફાઈલ")
