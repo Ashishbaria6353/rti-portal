@@ -5,8 +5,8 @@ import os
 import base64
 import gspread
 
-# --- પેજ સેટઅપ ---
-st.set_page_config(page_title="RTI Manage Portal", layout="wide")
+# --- પેજ સેટઅપ (સ્લાઇડર ડિફોલ્ટ ઓપન રાખવા) ---
+st.set_page_config(page_title="RTI Manage Portal", initial_sidebar_state="expanded", layout="wide")
 
 # --- સ્માર્ટ અને પરફેક્ટ ગૂગલ શીટ કનેક્શન ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -20,10 +20,11 @@ except:
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
 
-# --- શાનદાર CSS ડિઝાઇન ---
+# --- શાનદાર CSS ડિઝાઇન (હેડર ચાલુ રાખ્યું છે જેથી સ્લાઇડર બટન દેખાય) ---
 st.markdown("""
 <style>
-#MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
+#MainMenu {visibility: hidden;} footer {visibility: hidden;} 
+/* અગાઉ અહી header છુપાવેલું હતું, જે મેં કાઢી નાખ્યું છે જેથી > બટન દેખાય */
 .block-container { background-color: #f4f7f6; padding: 1.5rem 1rem !important; }
 .login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 8px 16px rgba(0,0,0,0.1); max-width: 450px; margin: auto; border-top: 4px solid #1e3a8a; }
 .box { padding: 15px 10px; border-radius: 8px; text-align: center; color: white; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); margin-bottom: 12px; }
@@ -41,17 +42,26 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- પરમેનન્ટ લૉગિન સિસ્ટમ ---
-if 'logged_in' not in st.session_state: st.session_state['logged_in'] = False
-if 'user_name' not in st.session_state: st.session_state['user_name'] = ""
-if 'user_mobile' not in st.session_state: st.session_state['user_mobile'] = ""
-if 'manage_action_id' not in st.session_state: st.session_state['manage_action_id'] = None
+# --- પરમેનન્ટ લૉગિન સિસ્ટમ (રિફ્રેશ પ્રૂફ) ---
+if 'logged_in' not in st.session_state: 
+    st.session_state['logged_in'] = False
+    st.session_state['user_name'] = ""
+    st.session_state['user_mobile'] = ""
+if 'manage_action_id' not in st.session_state: 
+    st.session_state['manage_action_id'] = None
+
+# URL ચેક કરો (જો રિફ્રેશ થાય તો અહીંથી ડેટા પાછો મળશે)
+params = st.query_params
+if "mobile" in params and "name" in params and not st.session_state['logged_in']:
+    st.session_state['logged_in'] = True
+    st.session_state['user_mobile'] = params["mobile"]
+    st.session_state['user_name'] = params["name"]
 
 if not st.session_state['logged_in']:
-    st.markdown("<br><br><br>", unsafe_allow_html=True)
+    st.markdown("<br><br>", unsafe_allow_html=True)
     st.markdown("""
         <div class="login-card">
-            <h2 style='text-align: center; color: #1e3a8a; margin-top: 0;'>RTI MANAGE PORTAL માં આપનું સ્વાગત છે</h2>
+            <h2 style='text-align: center; color: #1e3a8a; margin-top: 0;'>RTI MANAGE PORTAL<br>માં આપનું સ્વાગત છે</h2>
             <p style='text-align: center; color: gray;'>કૃપા કરીને આગળ વધવા માટે નામ અને મોબાઈલ નંબર દાખલ કરો</p>
         </div>
     """, unsafe_allow_html=True)
@@ -63,19 +73,25 @@ if not st.session_state['logged_in']:
             u_mob = st.text_input("તમારો મોબાઈલ નંબર")
             if st.form_submit_button("લૉગિન કરો (Login)", type="primary", use_container_width=True):
                 if u_name and u_mob:
-                    st.session_state.update({'logged_in': True, 'user_name': u_name, 'user_mobile': str(u_mob)})
+                    st.session_state['logged_in'] = True
+                    st.session_state['user_name'] = u_name
+                    st.session_state['user_mobile'] = str(u_mob)
+                    # રિફ્રેશ માટે URL માં ડેટા સેવ કરો
+                    st.query_params["mobile"] = str(u_mob)
+                    st.query_params["name"] = u_name
                     st.rerun()
                 else:
                     st.error("નામ અને મોબાઈલ નંબર બંને દાખલ કરવા જરૂરી છે!")
     st.stop()
 
-# --- સાઈડબાર અને લૉગઆઉટ બટન ---
+# --- સાઈડબાર (સ્લાઇડર) અને લૉગઆઉટ બટન ---
 with st.sidebar:
     st.markdown("### 👤 તમારું પ્રોફાઈલ")
     st.info(f"**નામ:**\n{st.session_state['user_name']}\n\n**મોબાઈલ:**\n{st.session_state['user_mobile']}")
     st.divider()
     if st.button("લૉગઆઉટ કરો (Logout)", type="primary", use_container_width=True):
         st.session_state.clear()
+        st.query_params.clear() # URL માંથી પણ કાઢી નાખો
         st.rerun()
 
 ALL_COLS = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
@@ -137,7 +153,7 @@ if not df.empty:
 
 user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy() if not df.empty else pd.DataFrame(columns=ALL_COLS)
 
-# --- ટોચનું હેડર (Home બટન આઇકોન વગર) ---
+# --- ટોચનું હેડર (Home બટન સાથે) ---
 col_home, col_title, col_search = st.columns([1, 2, 1.5])
 with col_home:
     if st.button("Home", use_container_width=True):
@@ -150,7 +166,7 @@ with col_search:
 
 st.markdown("<hr style='border: 1px solid #cfd8dc; margin: 10px 0;'>", unsafe_allow_html=True)
 
-# --- કાઉન્ટર ડેટા (પેન્ડિંગ લૉજિક સુધારો) ---
+# --- કાઉન્ટર ડેટા ---
 total_rti = len(user_df)
 pending_rti = len(user_df[user_df["સ્ટેટસ"] != "નિકાલ"]) if not user_df.empty else 0
 first_due = len(user_df[user_df["સ્ટેટસ"] == "પ્રથમ અપીલ બાકી"]) if not user_df.empty else 0
@@ -174,7 +190,7 @@ with r2_c3: st.markdown(f'<div class="box b-green"><p class="label-text">અર�
 st.markdown("<br>", unsafe_allow_html=True)
 
 # --- ટેબ્સ ---
-tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ & નિકાલ"])
+tab1, tab2, tab3, tab4 = st.tabs(["🆕 નવી RTI", "⚖️ પ્રથમ અપીલ", "🏛️ બીજી અપીલ", "⚙️ મેનેજમેન્ટ, એડિટ & નિકાલ"])
 
 with tab1:
     with st.form("new_rti_form", clear_on_submit=True):
@@ -259,8 +275,32 @@ with tab3:
 
 with tab4:
     if not user_df.empty:
-        edit_choice = st.selectbox("નિકાલ કે ડિલીટ કરવા અરજી પસંદ કરો:", user_df.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
+        edit_choice = st.selectbox("એડિટ, નિકાલ કે ડિલીટ કરવા અરજી પસંદ કરો:", user_df.apply(lambda x: f"ID: {x['ID']} - {x['PIO_કચેરી']}", axis=1))
         edit_id = edit_choice.split(" - ")[0].replace("ID: ", "").strip()
+        e_row = user_df[user_df['ID'] == edit_id].iloc[0]
+        
+        # --- અરજી એડિટ (Edit) કરવાનું ફોર્મ ---
+        with st.form("edit_rti_form"):
+            st.markdown("##### ✏️ અરજીની વિગતો સુધારો (Edit)")
+            c1, c2 = st.columns(2)
+            with c1:
+                ed_pio = st.text_input("કચેરીનું નામ", value=str(e_row.get('PIO_કચેરી', '')))
+                ed_addr = st.text_area("સરનામું", value=str(e_row.get('PIO_સરનામું', '')))
+            with c2:
+                ed_speed = st.text_input("સ્પીડ પોસ્ટ નંબર", value=str(e_row.get('RTI_સ્પીડપોસ્ટ', '')))
+                ed_mob = st.text_input("મોબાઈલ નંબર", value=str(e_row.get('PIO_મોબાઈલ', '')))
+            
+            if st.form_submit_button("✅ વિગતો અપડેટ કરો"):
+                r_idx = df[df['ID'] == edit_id].index[0]
+                df.at[r_idx, 'PIO_કચેરી'] = str(ed_pio)
+                df.at[r_idx, 'PIO_સરનામું'] = str(ed_addr)
+                df.at[r_idx, 'RTI_સ્પીડપોસ્ટ'] = str(ed_speed)
+                df.at[r_idx, 'PIO_મોબાઈલ'] = str(ed_mob)
+                save_data_to_sheet(df)
+                st.success("અરજીની વિગતો સફળતાપૂર્વક અપડેટ થઈ ગઈ છે!")
+                st.rerun()
+        
+        st.markdown("<hr>", unsafe_allow_html=True)
         
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
