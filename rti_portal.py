@@ -4,11 +4,17 @@ from datetime import date
 import os
 import base64
 import gspread
+import io
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaIoBaseUpload
 
-# --- પેજ સેટઅપ (સ્લાઇડર ડિફોલ્ટ ઓપન રાખવા) ---
+# --- પેજ સેટઅપ ---
 st.set_page_config(page_title="RTI Manage Portal", initial_sidebar_state="expanded", layout="wide")
 
-# --- સ્માર્ટ અને પરફેક્ટ ગૂગલ શીટ કનેક્શન ---
+# --- ગૂગલ ડ્રાઇવ ફોલ્ડર ID ---
+DRIVE_FOLDER_ID = "11tVZZ7RaaPspQB2CQa1exDJpfhnnn3jz"
+
+# --- સ્માર્ટ ગૂગલ શીટ અને ડ્રાઇવ કનેક્શન ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 try:
     from google.oauth2.service_account import Credentials
@@ -20,11 +26,10 @@ except:
 client = gspread.authorize(creds)
 sheet = client.open("RTI_Database").sheet1
 
-# --- શાનદાર CSS ડિઝાઇન (હેડર માર્જિન સુધારેલ છે જેથી ઉપરનો ભાગ દબાય નહીં) ---
+# --- શાનદાર CSS ડિઝાઇન ---
 st.markdown("""
 <style>
 #MainMenu {visibility: hidden;} footer {visibility: hidden;}
-/* ઉપરનો ભાગ દબાઈ ન જાય તે માટે પેડિંગ એડજસ્ટ કર્યું છે */
 .block-container { background-color: #f4f7f6; padding-top: 3rem !important; padding-bottom: 1.5rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
 .login-card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0px 8px 16px rgba(0,0,0,0.1); max-width: 450px; margin: auto; border-top: 4px solid #1e3a8a; }
 .box { padding: 15px 10px; border-radius: 8px; text-align: center; color: white; box-shadow: 0px 4px 6px rgba(0,0,0,0.1); margin-bottom: 12px; }
@@ -46,7 +51,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# --- પરમેનન્ટ લૉગિન સિસ્ટમ (રિફ્રેશ પ્રૂફ) ---
+# --- પરમેનન્ટ લૉગિન સિસ્ટમ ---
 if 'logged_in' not in st.session_state: 
     st.session_state['logged_in'] = False
     st.session_state['user_name'] = ""
@@ -54,7 +59,6 @@ if 'logged_in' not in st.session_state:
 if 'manage_action_id' not in st.session_state: 
     st.session_state['manage_action_id'] = None
 
-# URL ચેક કરો (જો રિફ્રેશ થાય તો અહીંથી ડેટા પાછો મળશે)
 params = st.query_params
 if "mobile" in params and "name" in params and not st.session_state['logged_in']:
     st.session_state['logged_in'] = True
@@ -80,7 +84,6 @@ if not st.session_state['logged_in']:
                     st.session_state['logged_in'] = True
                     st.session_state['user_name'] = u_name
                     st.session_state['user_mobile'] = str(u_mob)
-                    # રિફ્રેશ માટે URL માં ડેટા સેવ કરો
                     st.query_params["mobile"] = str(u_mob)
                     st.query_params["name"] = u_name
                     st.rerun()
@@ -88,27 +91,36 @@ if not st.session_state['logged_in']:
                     st.error("નામ અને મોબાઈલ નંબર બંને દાખલ કરવા જરૂરી છે!")
     st.stop()
 
-# --- સાઈડબાર (સ્લાઇડર) અને લૉગઆઉટ બટન ---
+# --- સાઈડબાર ---
 with st.sidebar:
     st.markdown("### 👤 તમારું પ્રોફાઈલ")
     st.info(f"**નામ:**\n{st.session_state['user_name']}\n\n**મોબાઈલ:**\n{st.session_state['user_mobile']}")
     st.divider()
     if st.button("લૉગઆઉટ કરો (Logout)", type="primary", use_container_width=True):
         st.session_state.clear()
-        st.query_params.clear() # URL માંથી પણ કાઢી નાખો
+        st.query_params.clear() 
         st.rerun()
 
 ALL_COLS = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
             'FAA_તારીખ', 'FAA_સુનાવણી_તારીખ', 'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
             'SA_તારીખ', 'SA_સુનાવણી_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
 
+# --- ગૂગલ ડ્રાઇવમાં ફાઈલ અપલોડ કરવાનું સ્માર્ટ ફંક્શન ---
 def save_uploaded_file(uploaded_file):
     if uploaded_file is not None:
-        os.makedirs("uploads", exist_ok=True)
-        file_path = os.path.join("uploads", uploaded_file.name)
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        return file_path
+        try:
+            drive_service = build('drive', 'v3', credentials=creds)
+            file_metadata = {'name': uploaded_file.name, 'parents': [DRIVE_FOLDER_ID]}
+            media = MediaIoBaseUpload(io.BytesIO(uploaded_file.getvalue()), mimetype=uploaded_file.type, resumable=True)
+            file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
+            file_id = file.get('id')
+            
+            # ફાઈલને પ્રિવ્યૂ માટે એક્સેસ આપવી
+            drive_service.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
+            return file_id # ડ્રાઇવનો ID રિટર્ન કરશે
+        except Exception as e:
+            st.error(f"ડ્રાઇવમાં ફાઈલ સેવ કરવામાં ભૂલ: {e}")
+            return ""
     return ""
 
 def load_data():
@@ -152,12 +164,11 @@ if not df.empty:
                 df.at[i, 'સ્ટેટસ'] = 'બીજી અપીલ બાકી'
                 updated = True
 
-    if updated:
-        save_data_to_sheet(df)
+    if updated: save_data_to_sheet(df)
 
 user_df = df[df['User_Mobile'] == st.session_state['user_mobile']].copy() if not df.empty else pd.DataFrame(columns=ALL_COLS)
 
-# --- ટોચનું હેડર (Home બટન સાથે) ---
+# --- ટોચનું હેડર ---
 col_home, col_title, col_search = st.columns([1, 2, 1.5])
 with col_home:
     if st.button("🏠 Home", use_container_width=True):
@@ -211,15 +222,16 @@ with tab1:
             rti_file = st.file_uploader("PDF ફાઈલ અપલોડ કરો", type=["pdf", "png", "jpg"])
         
         if st.form_submit_button("SAVE RTI"):
-            new_id = "1" if df.empty else str(int(pd.to_numeric(df['ID'], errors='coerce').dropna().max() + 1))
-            new_row = {col: "" for col in ALL_COLS}
-            new_row.update({"ID": new_id, "User_Mobile": str(st.session_state['user_mobile']), "સ્ટેટસ": "પેન્ડિંગ", 
-                            "RTI_તારીખ": str(rti_date), "PIO_કચેરી": pio_name, "PIO_સરનામું": pio_address, 
-                            "PIO_પિનકોડ": pio_pin, "PIO_મોબાઈલ": pio_mob, "RTI_સ્પીડપોસ્ટ": rti_speed, 
-                            "RTI_ફાઈલ": save_uploaded_file(rti_file)})
-            df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
-            save_data_to_sheet(df)
-            st.success(f"નવી RTI સફળતાપૂર્વક સેવ થઈ ગઈ છે! ID: {new_id}")
+            with st.spinner('ગૂગલ ડ્રાઇવમાં સેવ થઈ રહ્યું છે...'):
+                new_id = "1" if df.empty else str(int(pd.to_numeric(df['ID'], errors='coerce').dropna().max() + 1))
+                new_row = {col: "" for col in ALL_COLS}
+                new_row.update({"ID": new_id, "User_Mobile": str(st.session_state['user_mobile']), "સ્ટેટસ": "પેન્ડિંગ", 
+                                "RTI_તારીખ": str(rti_date), "PIO_કચેરી": pio_name, "PIO_સરનામું": pio_address, 
+                                "PIO_પિનકોડ": pio_pin, "PIO_મોબાઈલ": pio_mob, "RTI_સ્પીડપોસ્ટ": rti_speed, 
+                                "RTI_ફાઈલ": save_uploaded_file(rti_file)})
+                df = pd.concat([df, pd.DataFrame([new_row])], ignore_index=True)
+                save_data_to_sheet(df)
+            st.success(f"નવી RTI સફળતાપૂર્વક ડ્રાઇવમાં સેવ થઈ ગઈ છે! ID: {new_id}")
             st.rerun()
 
 with tab2:
@@ -240,16 +252,17 @@ with tab2:
                 faa_speed = st.text_input("સ્પીડ પોસ્ટ નંબર", value=str(e_row.get('FAA_સ્પીડપોસ્ટ', '')))
                 faa_file = st.file_uploader("પ્રથમ અપીલની PDF", type=["pdf"])
             if st.form_submit_button("SAVE FIRST APPEAL"):
-                r_idx = df[df['ID'] == rti_id].index[0]
-                df.at[r_idx, 'FAA_તારીખ'] = str(faa_date)
-                df.at[r_idx, 'FAA_સુનાવણી_તારીખ'] = str(faa_hearing)
-                df.at[r_idx, 'FAA_અધિકારી'] = str(faa_name)
-                df.at[r_idx, 'FAA_સરનામું'] = str(faa_address)
-                df.at[r_idx, 'FAA_સ્પીડપોસ્ટ'] = str(faa_speed)
-                if faa_file: df.at[r_idx, 'FAA_ફાઈલ'] = save_uploaded_file(faa_file)
-                df.at[r_idx, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
-                save_data_to_sheet(df)
-                st.success("પ્રથમ અપીલ સેવ થઈ ગઈ છે!")
+                with st.spinner('ગૂગલ ડ્રાઇવમાં સેવ થઈ રહ્યું છે...'):
+                    r_idx = df[df['ID'] == rti_id].index[0]
+                    df.at[r_idx, 'FAA_તારીખ'] = str(faa_date)
+                    df.at[r_idx, 'FAA_સુનાવણી_તારીખ'] = str(faa_hearing)
+                    df.at[r_idx, 'FAA_અધિકારી'] = str(faa_name)
+                    df.at[r_idx, 'FAA_સરનામું'] = str(faa_address)
+                    df.at[r_idx, 'FAA_સ્પીડપોસ્ટ'] = str(faa_speed)
+                    if faa_file: df.at[r_idx, 'FAA_ફાઈલ'] = save_uploaded_file(faa_file)
+                    df.at[r_idx, 'સ્ટેટસ'] = 'પ્રથમ અપીલ પેન્ડિંગ'
+                    save_data_to_sheet(df)
+                st.success("પ્રથમ અપીલ ડ્રાઇવમાં સેવ થઈ ગઈ છે!")
                 st.rerun()
     else: st.warning("પ્રથમ અપીલ માટે કોઈ અરજી બાકી નથી.")
 
@@ -266,14 +279,15 @@ with tab3:
             sa_speed = st.text_input("સ્પીડ પોસ્ટ નંબર", value=str(e_row_sa.get('SA_સ્પીડપોસ્ટ', '')))
             sa_file = st.file_uploader("બીજી અપીલની PDF", type=["pdf"])
             if st.form_submit_button("SAVE SECOND APPEAL"):
-                r_idx = df[df['ID'] == sa_id].index[0]
-                df.at[r_idx, 'SA_તારીખ'] = str(sa_date)
-                df.at[r_idx, 'SA_સુનાવણી_તારીખ'] = str(sa_hearing)
-                df.at[r_idx, 'SA_સ્પીડપોસ્ટ'] = str(sa_speed)
-                if sa_file: df.at[r_idx, 'SA_ફાઈલ'] = save_uploaded_file(sa_file)
-                df.at[r_idx, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
-                save_data_to_sheet(df)
-                st.success("બીજી અપીલ સેવ થઈ ગઈ છે!")
+                with st.spinner('ગૂગલ ડ્રાઇવમાં સેવ થઈ રહ્યું છે...'):
+                    r_idx = df[df['ID'] == sa_id].index[0]
+                    df.at[r_idx, 'SA_તારીખ'] = str(sa_date)
+                    df.at[r_idx, 'SA_સુનાવણી_તારીખ'] = str(sa_hearing)
+                    df.at[r_idx, 'SA_સ્પીડપોસ્ટ'] = str(sa_speed)
+                    if sa_file: df.at[r_idx, 'SA_ફાઈલ'] = save_uploaded_file(sa_file)
+                    df.at[r_idx, 'સ્ટેટસ'] = 'બીજી અપીલ પેન્ડિંગ'
+                    save_data_to_sheet(df)
+                st.success("બીજી અપીલ ડ્રાઇવમાં સેવ થઈ ગઈ છે!")
                 st.rerun()
     else: st.warning("બીજી અપીલ માટે કોઈ અરજી બાકી નથી.")
 
@@ -283,7 +297,6 @@ with tab4:
         edit_id = edit_choice.split(" - ")[0].replace("ID: ", "").strip()
         e_row = user_df[user_df['ID'] == edit_id].iloc[0]
         
-        # --- અરજી એડિટ (Edit) કરવાનું ફોર્મ ---
         with st.form("edit_rti_form"):
             st.markdown("##### ✏️ અરજીની વિગતો સુધારો (Edit)")
             c1, c2 = st.columns(2)
@@ -305,7 +318,6 @@ with tab4:
                 st.rerun()
         
         st.markdown("<hr>", unsafe_allow_html=True)
-        
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
             if st.button("✅ જવાબ આવી ગયો (નિકાલ કરો)", type="primary", use_container_width=True):
@@ -323,7 +335,7 @@ with tab4:
     else:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
 
-# --- વ્યુ (View) ફીચર અને બધી વિગતો પ્રદર્શિત કરવી ---
+# --- વ્યુ (View) ફીચર (ગૂગલ ડ્રાઇવ પ્રિવ્યૂ સાથે) ---
 if st.session_state['manage_action_id']:
     real_m_id = st.session_state['manage_action_id']
     m_row_data = user_df[user_df['ID'] == real_m_id]
@@ -334,50 +346,31 @@ if st.session_state['manage_action_id']:
             st.rerun()
         
         m_row = m_row_data.iloc[0]
-        
-        # અરજીની સંપૂર્ણ માહિતી બતાવવા માટે કાર્ડ્સ
         c1, c2, c3 = st.columns(3)
-        
         with c1:
-            st.markdown('<div class="detail-card">', unsafe_allow_html=True)
-            st.markdown('<div class="detail-title">📝 મૂળ RTI ની વિગતો</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">RTI તારીખ:</span> {m_row.get("RTI_તારીખ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">PIO કચેરી:</span> {m_row.get("PIO_કચેરી", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">સરનામું:</span> {m_row.get("PIO_સરનામું", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("RTI_સ્પીડપોસ્ટ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
+            st.markdown('<div class="detail-card"><div class="detail-title">📝 મૂળ RTI ની વિગતો</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">RTI તારીખ:</span> {m_row.get("RTI_તારીખ", "-")}</div><div class="detail-item"><span class="detail-label">PIO કચેરી:</span> {m_row.get("PIO_કચેરી", "-")}</div><div class="detail-item"><span class="detail-label">સરનામું:</span> {m_row.get("PIO_સરનામું", "-")}</div><div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("RTI_સ્પીડપોસ્ટ", "-")}</div></div>', unsafe_allow_html=True)
         with c2:
-            st.markdown('<div class="detail-card">', unsafe_allow_html=True)
-            st.markdown('<div class="detail-title">⚖️ પ્રથમ અપીલની વિગતો</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">અપીલ તારીખ:</span> {m_row.get("FAA_તારીખ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">અધિકારી:</span> {m_row.get("FAA_અધિકારી", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">સુનાવણી તારીખ:</span> {m_row.get("FAA_સુનાવણી_તારીખ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("FAA_સ્પીડપોસ્ટ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
-
+            st.markdown('<div class="detail-card"><div class="detail-title">⚖️ પ્રથમ અપીલની વિગતો</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">અપીલ તારીખ:</span> {m_row.get("FAA_તારીખ", "-")}</div><div class="detail-item"><span class="detail-label">અધિકારી:</span> {m_row.get("FAA_અધિકારી", "-")}</div><div class="detail-item"><span class="detail-label">સુનાવણી તારીખ:</span> {m_row.get("FAA_સુનાવણી_તારીખ", "-")}</div><div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("FAA_સ્પીડપોસ્ટ", "-")}</div></div>', unsafe_allow_html=True)
         with c3:
-            st.markdown('<div class="detail-card">', unsafe_allow_html=True)
-            st.markdown('<div class="detail-title">🏛️ બીજી અપીલની વિગતો</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">અપીલ તારીખ:</span> {m_row.get("SA_તારીખ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">સુનાવણી તારીખ:</span> {m_row.get("SA_સુનાવણી_તારીખ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown(f'<div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("SA_સ્પીડપોસ્ટ", "-")}</div>', unsafe_allow_html=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('<div class="detail-card"><div class="detail-title">🏛️ બીજી અપીલની વિગતો</div>', unsafe_allow_html=True)
+            st.markdown(f'<div class="detail-item"><span class="detail-label">અપીલ તારીખ:</span> {m_row.get("SA_તારીખ", "-")}</div><div class="detail-item"><span class="detail-label">સુનાવણી તારીખ:</span> {m_row.get("SA_સુનાવણી_તારીખ", "-")}</div><div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("SA_સ્પીડપોસ્ટ", "-")}</div></div>', unsafe_allow_html=True)
 
-        st.markdown("#### 📄 અપલોડ કરેલા દસ્તાવેજો (PDF/Image)")
-        def show_pdf(file_path, label):
-            if file_path and os.path.exists(str(file_path)):
+        st.markdown("#### 📄 અપલોડ કરેલા દસ્તાવેજો (ગૂગલ ડ્રાઇવ)")
+        def show_pdf(file_id, label):
+            if file_id and str(file_id) != "nan" and str(file_id).strip() != "":
                 st.write(f"**{label}**")
-                try:
-                    with open(file_path, "rb") as f:
-                        base64_pdf = base64.b64encode(f.read()).decode('utf-8')
-                    # Check if it's an image
-                    if str(file_path).lower().endswith(('.png', '.jpg', '.jpeg')):
-                         st.markdown(f'<img src="data:image/jpeg;base64,{base64_pdf}" width="100%">', unsafe_allow_html=True)
-                    else:
-                         st.markdown(f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="400px"></iframe>', unsafe_allow_html=True)
-                except Exception as e:
-                    st.error(f"ફાઈલ બતાવવામાં ભૂલ: {e}")
+                # જો તે ડ્રાઇવનો ID હોય (જેમાં સ્લેશ / ના હોય અને લંબાઈ 15 થી વધુ હોય)
+                if "/" not in str(file_id) and "\\" not in str(file_id) and len(str(file_id)) > 15:
+                    iframe_url = f"https://drive.google.com/file/d/{file_id}/preview"
+                    st.markdown(f'<iframe src="{iframe_url}" width="100%" height="450px" style="border: none; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1);"></iframe>', unsafe_allow_html=True)
+                else:
+                    # જૂની લોકલ ફાઈલોનો બેકઅપ (જો કોઈ હોય તો)
+                    if os.path.exists(str(file_id)):
+                        with open(file_id, "rb") as f:
+                            b64 = base64.b64encode(f.read()).decode('utf-8')
+                        st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="450px"></iframe>', unsafe_allow_html=True)
 
         show_pdf(m_row.get('RTI_ફાઈલ'), "RTI ફાઈલ")
         show_pdf(m_row.get('FAA_ફાઈલ'), "પ્રથમ અપીલ ફાઈલ")
