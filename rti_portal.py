@@ -223,7 +223,7 @@ with tab1:
             pio_name = st.text_input("કચેરીનું નામ")
             pio_address = st.text_area("સરનામું")
         with col_b:
-            pio_pin = st.text_input("પિન 코ડ")
+            pio_pin = st.text_input("પિનકોડ")
             pio_mob = st.text_input("મોબાઈલ નંબર")
             rti_speed = st.text_input("સ્પીડ પોસ્ટ નંબર")
             rti_file = st.file_uploader("PDF ફાઈલ અપલોડ કરો", type=["pdf", "png", "jpg"])
