@@ -342,7 +342,7 @@ with tab4:
     else:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
 
-# --- વ્યુ (View) ફીચર (ગૂગલ ડ્રાઇવ પ્રિવ્યૂ સાથે) ---
+# --- વ્યુ (View) ફીચર (નવા સ્માર્ટ બટન સાથે) ---
 if st.session_state['manage_action_id']:
     real_m_id = st.session_state['manage_action_id']
     m_row_data = user_df[user_df['ID'] == real_m_id]
@@ -364,22 +364,29 @@ if st.session_state['manage_action_id']:
             st.markdown('<div class="detail-card"><div class="detail-title">🏛️ બીજી અપીલની વિગતો</div>', unsafe_allow_html=True)
             st.markdown(f'<div class="detail-item"><span class="detail-label">અપીલ તારીખ:</span> {m_row.get("SA_તારીખ", "-")}</div><div class="detail-item"><span class="detail-label">સુનાવણી તારીખ:</span> {m_row.get("SA_સુનાવણી_તારીખ", "-")}</div><div class="detail-item"><span class="detail-label">સ્પીડ પોસ્ટ:</span> {m_row.get("SA_સ્પીડપોસ્ટ", "-")}</div></div>', unsafe_allow_html=True)
 
-        st.markdown("#### 📄 અપલોડ કરેલા દસ્તાવેજો (ગૂગલ ડ્રાઇવ)")
+        st.markdown("#### 📄 અપલોડ કરેલા દસ્તાવેજો")
+        st.markdown("<hr style='margin: 0; padding: 0; border: 1px solid #e5e7eb;'>", unsafe_allow_html=True)
+        
         def show_pdf(file_id, label):
             if file_id and str(file_id) != "nan" and str(file_id).strip() != "":
-                st.write(f"**{label}**")
                 # જો તે ડ્રાઇવનો ID હોય (જેમાં સ્લેશ / ના હોય અને લંબાઈ 15 થી વધુ હોય)
                 if "/" not in str(file_id) and "\\" not in str(file_id) and len(str(file_id)) > 15:
-                    iframe_url = f"https://drive.google.com/file/d/{file_id}/preview"
-                    st.markdown(f'<iframe src="{iframe_url}" width="100%" height="450px" style="border: none; border-radius: 8px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1);"></iframe>', unsafe_allow_html=True)
+                    view_url = f"https://drive.google.com/file/d/{file_id}/view"
+                    doc_c1, doc_c2 = st.columns([3, 1])
+                    with doc_c1:
+                        st.markdown(f"<div style='padding-top:10px; font-size:16px;'>📄 <b>{label}</b></div>", unsafe_allow_html=True)
+                    with doc_c2:
+                        st.link_button("👁️ View (જુઓ)", view_url, use_container_width=True)
+                    st.markdown("<hr style='margin: 0; padding: 0; border: 1px solid #e5e7eb;'>", unsafe_allow_html=True)
                 else:
                     # જૂની લોકલ ફાઈલોનો બેકઅપ (જો કોઈ હોય તો)
                     if os.path.exists(str(file_id)):
+                        st.write(f"**{label}**")
                         with open(file_id, "rb") as f:
                             b64 = base64.b64encode(f.read()).decode('utf-8')
                         st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="450px"></iframe>', unsafe_allow_html=True)
 
-        show_pdf(m_row.get('RTI_ફાઈલ'), "RTI ફાઈલ")
+        show_pdf(m_row.get('RTI_ફાઈલ'), "મૂળ RTI ફાઈલ")
         show_pdf(m_row.get('FAA_ફાઈલ'), "પ્રથમ અપીલ ફાઈલ")
         show_pdf(m_row.get('SA_ફાઈલ'), "બીજી અપીલ ફાઈલ")
 
