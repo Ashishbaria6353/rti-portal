@@ -325,7 +325,6 @@ with tab4:
                 st.success("અરજીની વિગતો સફળતાપૂર્વક અપડેટ થઈ ગઈ છે!")
                 st.rerun()
         
-        # --- નવો સુધારો: વધુ દસ્તાવેજો ઉમેરવાનું ફોર્મ ---
         st.markdown("<hr style='margin-bottom:10px;'>", unsafe_allow_html=True)
         st.markdown("##### ➕ વધુ દસ્તાવેજ ઉમેરો (કોઈ પત્ર મળ્યો હોય કે અન્ય દસ્તાવેજ)")
         with st.form("add_extra_doc_form", clear_on_submit=True):
@@ -374,7 +373,7 @@ with tab4:
     else:
         st.info("કોઈ અરજી ઉપલબ્ધ નથી.")
 
-# --- વ્યુ (View) ફીચર (નવા સ્માર્ટ બટન સાથે) ---
+# --- વ્યુ (View) ફીચર અને રિપોર્ટ ડાઉનલોડ ---
 if st.session_state['manage_action_id']:
     real_m_id = st.session_state['manage_action_id']
     m_row_data = user_df[user_df['ID'] == real_m_id]
@@ -420,7 +419,6 @@ if st.session_state['manage_action_id']:
         show_pdf(m_row.get('FAA_ફાઈલ'), "પ્રથમ અપીલ ફાઈલ")
         show_pdf(m_row.get('SA_ફાઈલ'), "બીજી અપીલ ફાઈલ")
 
-        # --- નવો સુધારો: વધારાના દસ્તાવેજો બતાવવા માટે ---
         extra_docs_str = m_row.get('વધારાના_દસ્તાવેજો', '')
         if extra_docs_str and str(extra_docs_str) != "nan":
             try:
@@ -428,8 +426,91 @@ if st.session_state['manage_action_id']:
                 for ed in extra_list:
                     doc_label = f"📌 {ed['name']} (તારીખ: {ed['date']})"
                     show_pdf(ed['file_id'], doc_label)
-            except:
-                pass
+            except: pass
+
+        # --- નવો સુધારો: ઘટનાક્રમ (Timeline) રિપોર્ટ બનાવવો ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        events = []
+        if str(m_row.get('RTI_તારીખ', '')) not in ["", "nan", "None"]:
+            events.append({"date": str(m_row.get('RTI_તારીખ', '')), "title": "મૂળ RTI દાખલ કરી", "details": f"PIO: {m_row.get('PIO_કચેરી', '-')} <br>સ્પીડ પોસ્ટ: {m_row.get('RTI_સ્પીડપોસ્ટ', '-')}"})
+        if str(m_row.get('FAA_તારીખ', '')) not in ["", "nan", "None"]:
+            events.append({"date": str(m_row.get('FAA_તારીખ', '')), "title": "પ્રથમ અપીલ દાખલ કરી", "details": f"અધિકારી: {m_row.get('FAA_અધિકારી', '-')} <br>સુનાવણી: {m_row.get('FAA_સુનાવણી_તારીખ', '-')} <br>સ્પીડ પોસ્ટ: {m_row.get('FAA_સ્પીડપોસ્ટ', '-')}"})
+        if str(m_row.get('SA_તારીખ', '')) not in ["", "nan", "None"]:
+            events.append({"date": str(m_row.get('SA_તારીખ', '')), "title": "બીજી અપીલ દાખલ કરી", "details": f"સુનાવણી: {m_row.get('SA_સુનાવણી_તારીખ', '-')} <br>સ્પીડ પોસ્ટ: {m_row.get('SA_સ્પીડપોસ્ટ', '-')}"})
+        
+        if extra_docs_str and str(extra_docs_str) != "nan":
+            try:
+                for ed in json.loads(str(extra_docs_str)):
+                    events.append({"date": ed.get('date', ''), "title": f"વધારાનો દસ્તાવેજ/પત્ર", "details": f"વિગત: {ed.get('name', '')}"})
+            except: pass
+
+        # તારીખ મુજબ સોર્ટ (Sort) કરો
+        def sort_key(x):
+            try: return pd.to_datetime(x["date"])
+            except: return pd.to_datetime("1900-01-01")
+        events.sort(key=sort_key)
+
+        # HTML ટેબલ અને રિપોર્ટ ડીઝાઇન 
+        html_content = f"""
+        <html>
+        <head>
+        <meta charset="utf-8">
+        <style>
+            body {{ font-family: Arial, sans-serif; padding: 30px; color: #000; }}
+            .header {{ text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; }}
+            h2, h3 {{ color: #1e3a8a; margin-bottom: 10px; }}
+            .info-table {{ width: 100%; border-collapse: collapse; margin-bottom: 20px; }}
+            .info-table th, .info-table td {{ border: 1px solid #000; padding: 10px; text-align: left; font-size: 14px; }}
+            .info-table th {{ background-color: #f2f2f2; width: 20%; }}
+            .timeline-table {{ width: 100%; border-collapse: collapse; margin-top: 10px; }}
+            .timeline-table th, .timeline-table td {{ border: 1px solid #000; padding: 12px; text-align: left; font-size: 14px; vertical-align: top; }}
+            .timeline-table th {{ background-color: #1e3a8a; color: white; text-align: center; }}
+        </style>
+        </head>
+        <body>
+            <div class="header">
+                <h2>RTI અરજીનો સંપૂર્ણ ઘટનાક્રમ રિપોર્ટ</h2>
+            </div>
+            
+            <h3>અરજદાર અને મૂળ અરજીની વિગત:</h3>
+            <table class="info-table">
+                <tr><th>અરજદારનું નામ:</th><td>{st.session_state['user_name']}</td><th>RTI ID:</th><td>{real_m_id}</td></tr>
+                <tr><th>મોબાઈલ નંબર:</th><td>{st.session_state['user_mobile']}</td><th>હાલનું સ્ટેટસ:</th><td><b>{m_row.get('સ્ટેટસ', '-')}</b></td></tr>
+                <tr><th>PIO કચેરી:</th><td colspan="3">{m_row.get('PIO_કચેરી', '-')} - {m_row.get('PIO_સરનામું', '-')}</td></tr>
+            </table>
+
+            <h3>ઘટનાક્રમ (Timeline):</h3>
+            <table class="timeline-table">
+                <tr>
+                    <th style="width: 5%;">ક્રમ</th>
+                    <th style="width: 15%;">તારીખ</th>
+                    <th style="width: 30%;">ઘટના / તબક્કો</th>
+                    <th style="width: 50%;">વિગત / નોંધ</th>
+                </tr>
+        """
+        for idx, ev in enumerate(events):
+            html_content += f"""
+                <tr>
+                    <td style="text-align:center;"><b>{idx + 1}</b></td>
+                    <td><b>{ev['date']}</b></td>
+                    <td><b>{ev['title']}</b></td>
+                    <td>{ev['details']}</td>
+                </tr>
+            """
+        html_content += """
+            </table>
+            <p style="text-align:right; margin-top:30px; font-size:12px;">*આ રિપોર્ટ સિસ્ટમ જનરેટેડ છે.*</p>
+        </body>
+        </html>
+        """
+
+        st.download_button(
+            label="📥 રિપોર્ટ ડાઉનલોડ કરો (PDF માટે Print કરો)",
+            data=html_content.encode('utf-8'),
+            file_name=f"RTI_Report_ID_{real_m_id}.html",
+            mime="text/html",
+            use_container_width=True
+        )
 
 st.markdown("---")
 
