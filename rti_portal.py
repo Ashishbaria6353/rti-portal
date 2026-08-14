@@ -5,14 +5,16 @@ import os
 import base64
 import gspread
 import io
+import requests
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
 # --- પેજ સેટઅપ ---
 st.set_page_config(page_title="RTI Manage Portal", initial_sidebar_state="expanded", layout="wide")
 
-# --- ગૂગલ ડ્રાઇવ ફોલ્ડર ID ---
+# --- ગૂગલ ડ્રાઇવ ફોલ્ડર ID અને નવી WEB APP લિંક ---
 DRIVE_FOLDER_ID = "11tVZZ7RaaPspQB2CQa1exDJpfhnnn3jz"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbw8EhIN4NM171HMAaMaZYkmUEE78oGilOTvH_Y5RhZyH7XqVoxAkyZYHWa9kuewFFkn/exec"
 
 # --- સ્માર્ટ ગૂગલ શીટ અને ડ્રાઇવ કનેક્શન ---
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -109,17 +111,22 @@ ALL_COLS = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'P
 def save_uploaded_file(uploaded_file):
     if uploaded_file is not None:
         try:
-            drive_service = build('drive', 'v3', credentials=creds)
-            file_metadata = {'name': uploaded_file.name, 'parents': [DRIVE_FOLDER_ID]}
-            media = MediaIoBaseUpload(io.BytesIO(uploaded_file.getvalue()), mimetype=uploaded_file.type, resumable=True)
-            file = drive_service.files().create(body=file_metadata, media_body=media, fields='id').execute()
-            file_id = file.get('id')
-            
-            # ફાઈલને પ્રિવ્યૂ માટે એક્સેસ આપવી
-            drive_service.permissions().create(fileId=file_id, body={'type': 'anyone', 'role': 'reader'}).execute()
-            return file_id # ડ્રાઇવનો ID રિટર્ન કરશે
+            file_bytes = uploaded_file.getvalue()
+            base64_encoded = base64.b64encode(file_bytes).decode('utf-8')
+            payload = {
+                "fileName": uploaded_file.name,
+                "mimeType": uploaded_file.type,
+                "fileData": base64_encoded
+            }
+            response = requests.post(WEB_APP_URL, data=payload)
+            result = response.json()
+            if result.get("status") == "success":
+                return result.get("fileId")
+            else:
+                st.error(f"અપલોડ એરર: {result.get('message')}")
+                return ""
         except Exception as e:
-            st.error(f"ડ્રાઇવમાં ફાઈલ સેવ કરવામાં ભૂલ: {e}")
+            st.error(f"કનેક્શન એરર: ફાઈલ સેવ થઈ શકી નથી.")
             return ""
     return ""
 
@@ -216,7 +223,7 @@ with tab1:
             pio_name = st.text_input("કચેરીનું નામ")
             pio_address = st.text_area("સરનામું")
         with col_b:
-            pio_pin = st.text_input("પિન કોડ")
+            pio_pin = st.text_input("પિન 코ડ")
             pio_mob = st.text_input("મોબાઈલ નંબર")
             rti_speed = st.text_input("સ્પીડ પોસ્ટ નંબર")
             rti_file = st.file_uploader("PDF ફાઈલ અપલોડ કરો", type=["pdf", "png", "jpg"])
