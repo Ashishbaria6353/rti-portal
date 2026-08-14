@@ -6,6 +6,7 @@ import base64
 import gspread
 import io
 import requests
+import json
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
@@ -105,7 +106,7 @@ with st.sidebar:
 
 ALL_COLS = ['ID', 'User_Mobile', 'સ્ટેટસ', 'RTI_તારીખ', 'PIO_કચેરી', 'PIO_સરનામું', 'PIO_પિનકોડ', 'PIO_મોબાઈલ', 'RTI_સ્પીડપોસ્ટ', 'RTI_ફાઈલ', 
             'FAA_તારીખ', 'FAA_સુનાવણી_તારીખ', 'FAA_અધિકારી', 'FAA_સરનામું', 'FAA_પિનકોડ', 'FAA_મોબાઈલ', 'FAA_સ્પીડપોસ્ટ', 'FAA_ફાઈલ', 
-            'SA_તારીખ', 'SA_સુનાવણી_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ']
+            'SA_તારીખ', 'SA_સુનાવણી_તારીખ', 'SA_સ્પીડપોસ્ટ', 'SA_ફાઈલ', 'વધારાના_દસ્તાવેજો']
 
 # --- ગૂગલ ડ્રાઇવમાં ફાઈલ અપલોડ કરવાનું સ્માર્ટ ફંક્શન ---
 def save_uploaded_file(uploaded_file):
@@ -324,6 +325,37 @@ with tab4:
                 st.success("અરજીની વિગતો સફળતાપૂર્વક અપડેટ થઈ ગઈ છે!")
                 st.rerun()
         
+        # --- નવો સુધારો: વધુ દસ્તાવેજો ઉમેરવાનું ફોર્મ ---
+        st.markdown("<hr style='margin-bottom:10px;'>", unsafe_allow_html=True)
+        st.markdown("##### ➕ વધુ દસ્તાવેજ ઉમેરો (કોઈ પત્ર મળ્યો હોય કે અન્ય દસ્તાવેજ)")
+        with st.form("add_extra_doc_form", clear_on_submit=True):
+            ex_c1, ex_c2 = st.columns(2)
+            with ex_c1:
+                ex_date = st.date_input("પત્ર/દસ્તાવેજની તારીખ")
+                ex_name = st.text_input("દસ્તાવેજની વિગત (દા.ત. જવાબ મળ્યો, નોટિસ)")
+            with ex_c2:
+                ex_file = st.file_uploader("નવી PDF/ફોટો ફાઈલ", type=["pdf", "png", "jpg"])
+            
+            if st.form_submit_button("💾 નવો દસ્તાવેજ ઉમેરો"):
+                if ex_name and ex_file:
+                    with st.spinner('ડ્રાઇવમાં સેવ થઈ રહ્યું છે...'):
+                        new_file_id = save_uploaded_file(ex_file)
+                        if new_file_id:
+                            r_idx = df[df['ID'] == edit_id].index[0]
+                            existing_docs = df.at[r_idx, 'વધારાના_દસ્તાવેજો']
+                            try:
+                                docs_list = json.loads(str(existing_docs)) if existing_docs and str(existing_docs) != "nan" else []
+                            except:
+                                docs_list = []
+                            
+                            docs_list.append({"date": str(ex_date), "name": ex_name, "file_id": new_file_id})
+                            df.at[r_idx, 'વધારાના_દસ્તાવેજો'] = json.dumps(docs_list)
+                            save_data_to_sheet(df)
+                        st.success("નવો દસ્તાવેજ સફળતાપૂર્વક ઉમેરાઈ ગયો છે!")
+                        st.rerun()
+                else:
+                    st.warning("કૃપા કરીને દસ્તાવેજની વિગત અને ફાઈલ બંને દાખલ કરો.")
+        
         st.markdown("<hr>", unsafe_allow_html=True)
         col_btn1, col_btn2 = st.columns(2)
         with col_btn1:
@@ -369,7 +401,6 @@ if st.session_state['manage_action_id']:
         
         def show_pdf(file_id, label):
             if file_id and str(file_id) != "nan" and str(file_id).strip() != "":
-                # જો તે ડ્રાઇવનો ID હોય (જેમાં સ્લેશ / ના હોય અને લંબાઈ 15 થી વધુ હોય)
                 if "/" not in str(file_id) and "\\" not in str(file_id) and len(str(file_id)) > 15:
                     view_url = f"https://drive.google.com/file/d/{file_id}/view"
                     doc_c1, doc_c2 = st.columns([3, 1])
@@ -379,7 +410,6 @@ if st.session_state['manage_action_id']:
                         st.link_button("👁️ View (જુઓ)", view_url, use_container_width=True)
                     st.markdown("<hr style='margin: 0; padding: 0; border: 1px solid #e5e7eb;'>", unsafe_allow_html=True)
                 else:
-                    # જૂની લોકલ ફાઈલોનો બેકઅપ (જો કોઈ હોય તો)
                     if os.path.exists(str(file_id)):
                         st.write(f"**{label}**")
                         with open(file_id, "rb") as f:
@@ -389,6 +419,17 @@ if st.session_state['manage_action_id']:
         show_pdf(m_row.get('RTI_ફાઈલ'), "મૂળ RTI ફાઈલ")
         show_pdf(m_row.get('FAA_ફાઈલ'), "પ્રથમ અપીલ ફાઈલ")
         show_pdf(m_row.get('SA_ફાઈલ'), "બીજી અપીલ ફાઈલ")
+
+        # --- નવો સુધારો: વધારાના દસ્તાવેજો બતાવવા માટે ---
+        extra_docs_str = m_row.get('વધારાના_દસ્તાવેજો', '')
+        if extra_docs_str and str(extra_docs_str) != "nan":
+            try:
+                extra_list = json.loads(str(extra_docs_str))
+                for ed in extra_list:
+                    doc_label = f"📌 {ed['name']} (તારીખ: {ed['date']})"
+                    show_pdf(ed['file_id'], doc_label)
+            except:
+                pass
 
 st.markdown("---")
 
