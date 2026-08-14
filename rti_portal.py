@@ -99,7 +99,7 @@ with st.sidebar:
     st.markdown("### 👤 તમારું પ્રોફાઈલ")
     st.info(f"**નામ:**\n{st.session_state['user_name']}\n\n**મોબાઈલ:**\n{st.session_state['user_mobile']}")
     st.divider()
-    if st.button("લૉગઆઉટ કરો (Logout)", type="primary", use_container_width=True):
+    if st.button("(Logout)", type="primary", use_container_width=True):
         st.session_state.clear()
         st.query_params.clear() 
         st.rerun()
