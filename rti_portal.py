@@ -82,7 +82,7 @@ if not st.session_state['logged_in']:
         with st.form("login_form"):
             u_name = st.text_input("તમારું પૂરું નામ")
             u_mob = st.text_input("તમારો મોબાઈલ નંબર")
-            if st.form_submit_button("લૉગિન કરો (Login)", type="primary", use_container_width=True):
+            if st.form_submit_button("(Login)", type="primary", use_container_width=True):
                 if u_name and u_mob:
                     st.session_state['logged_in'] = True
                     st.session_state['user_name'] = u_name
