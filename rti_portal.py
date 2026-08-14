@@ -505,7 +505,7 @@ if st.session_state['manage_action_id']:
         """
 
         st.download_button(
-            label="📥 રિપોર્ટ ડાઉનલોડ કરો (PDF માટે Print કરો)",
+            label="📥 રિપોર્ટ ડાઉનલોડ કરો",
             data=html_content.encode('utf-8'),
             file_name=f"RTI_Report_ID_{real_m_id}.html",
             mime="text/html",
